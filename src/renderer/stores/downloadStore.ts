@@ -35,7 +35,7 @@ export interface DownloadTask {
   id: string
   videoInfo: VideoInfo
   selectedFormat: VideoFormat
-  status: 'pending' | 'downloading' | 'paused' | 'completed' | 'failed'
+  status: 'pending' | 'downloading' | 'completed' | 'failed'
   progress: number
   speed: string
   eta: string

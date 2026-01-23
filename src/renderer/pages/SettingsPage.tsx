@@ -1,9 +1,55 @@
-import React, { useCallback } from 'react'
-import { FolderOpen, Download, Globe, Palette, Bell, ArrowLeft } from 'lucide-react'
+import React, { useCallback, useState, useEffect } from 'react'
+import { FolderOpen, Download, Globe, Bell, ArrowLeft, LogIn, LogOut, CheckCircle, Loader2, FileUp, ExternalLink } from 'lucide-react'
 import { useDownloadStore, Settings } from '../stores/downloadStore'
 
 export const SettingsPage: React.FC = () => {
   const { settings, updateSettings, saveSettings, setCurrentPage } = useDownloadStore()
+  const [youtubeLoggedIn, setYoutubeLoggedIn] = useState(false)
+  const [checkingLogin, setCheckingLogin] = useState(true)
+
+  // 检查 YouTube 登录状态
+  useEffect(() => {
+    const checkLogin = async () => {
+      try {
+        const result = await window.electronAPI.checkYouTubeLogin()
+        setYoutubeLoggedIn(result.loggedIn)
+      } catch (error) {
+        console.error('检查登录状态失败:', error)
+      } finally {
+        setCheckingLogin(false)
+      }
+    }
+    checkLogin()
+  }, [])
+
+  // 打开浏览器登录 YouTube
+  const handleOpenBrowser = async () => {
+    await window.electronAPI.openYouTubeLogin()
+  }
+
+  // 导入 Cookies 文件
+  const handleImportCookies = async () => {
+    try {
+      const result = await window.electronAPI.importCookiesFile()
+      if (result.success) {
+        setYoutubeLoggedIn(true)
+      } else if (result.message && result.message !== '未选择文件') {
+        alert(result.message)
+      }
+    } catch (error) {
+      console.error('导入失败:', error)
+    }
+  }
+
+  // 处理 YouTube 登出
+  const handleYouTubeLogout = async () => {
+    try {
+      await window.electronAPI.logoutYouTube()
+      setYoutubeLoggedIn(false)
+    } catch (error) {
+      console.error('登出失败:', error)
+    }
+  }
 
   // 更新设置并保存到数据库
   const handleUpdateSettings = useCallback((newSettings: Partial<Settings>) => {
@@ -114,19 +160,76 @@ export const SettingsPage: React.FC = () => {
             <h2 className="text-lg font-semibold text-text-primary">网络设置</h2>
           </div>
           <div className="bg-surface-secondary rounded-xl p-5 space-y-4 border border-border shadow-soft">
-            {/* Cookies 来源浏览器 */}
+            {/* YouTube 登录 */}
             <div>
-              <label className="block text-sm text-text-secondary mb-2">Cookies 来源浏览器</label>
+              <label className="block text-sm text-text-secondary mb-2">YouTube 账号</label>
+              <div className="flex items-center gap-3 flex-wrap">
+                {checkingLogin ? (
+                  <div className="flex items-center gap-2 text-text-tertiary">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">检查登录状态...</span>
+                  </div>
+                ) : youtubeLoggedIn ? (
+                  <>
+                    <div className="flex items-center gap-2 text-green-500">
+                      <CheckCircle className="w-4 h-4" />
+                      <span className="text-sm">Cookies 已导入</span>
+                    </div>
+                    <button
+                      onClick={handleYouTubeLogout}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-red-400 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      清除
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleOpenBrowser}
+                      className="flex items-center gap-2 px-4 py-2 bg-surface-tertiary hover:bg-surface-hover border border-border rounded-lg text-sm text-text-primary transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      打开浏览器登录
+                    </button>
+                    <button
+                      onClick={handleImportCookies}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm text-white transition-colors"
+                    >
+                      <FileUp className="w-4 h-4" />
+                      导入 Cookies
+                    </button>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-text-tertiary mt-2">
+                步骤：1. 点击「打开浏览器登录」在浏览器中登录 YouTube →
+                2. 使用扩展导出 cookies.txt（推荐 "Get cookies.txt LOCALLY"）→
+                3. 点击「导入 Cookies」选择文件
+              </p>
+            </div>
+
+            {/* 分隔线 */}
+            <div className="border-t border-border"></div>
+
+            {/* Cookies 来源浏览器（备用方案） */}
+            <div>
+              <label className="block text-sm text-text-secondary mb-2">Cookies 来源浏览器（备用）</label>
               <select
                 value={settings.cookiesBrowser || 'chrome'}
                 onChange={(e) => handleUpdateSettings({ cookiesBrowser: e.target.value as 'none' | 'chrome' | 'safari' })}
                 className="w-full px-4 py-2.5 bg-surface-tertiary border border-border rounded-lg text-text-primary text-sm focus:outline-none focus:border-primary"
+                disabled={youtubeLoggedIn}
               >
                 <option value="none">不使用</option>
                 <option value="chrome">Chrome</option>
                 <option value="safari">Safari</option>
               </select>
-              <p className="text-xs text-text-tertiary mt-2">从浏览器获取登录 Cookies 以绕过 YouTube 机器人验证</p>
+              <p className="text-xs text-text-tertiary mt-2">
+                {youtubeLoggedIn
+                  ? '已使用 App 内登录，此选项已禁用'
+                  : '未登录时从系统浏览器获取 Cookies（开发模式可用）'}
+              </p>
             </div>
 
             {/* 代理设置 */}

@@ -1,10 +1,14 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import path from 'path'
 import os from 'os'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { ytdlpService } from './services/ytdlp'
 import { downloaderService, DownloadOptions } from './services/downloader'
 import { databaseService, HistoryItem, AppSettings } from './services/database'
+
+// Cookies 文件路径
+const COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'youtube_cookies.txt')
 
 // ESM 兼容 __dirname
 const __filename = fileURLToPath(import.meta.url)
@@ -161,16 +165,6 @@ ipcMain.handle('start-download', async (_, taskId: string, options: DownloadOpti
   }
 })
 
-// IPC 处理器 - 暂停下载
-ipcMain.handle('pause-download', (_, taskId: string) => {
-  return downloaderService.pauseDownload(taskId)
-})
-
-// IPC 处理器 - 恢复下载
-ipcMain.handle('resume-download', (_, taskId: string) => {
-  return downloaderService.resumeDownload(taskId)
-})
-
 // IPC 处理器 - 取消下载
 ipcMain.handle('cancel-download', (_, taskId: string) => {
   return downloaderService.cancelDownload(taskId)
@@ -266,4 +260,86 @@ ipcMain.handle('get-history-count', () => {
     console.error('获取历史记录数量失败:', error)
     return 0
   }
+})
+
+// ============ YouTube 登录相关 IPC 处理器 ============
+
+// IPC 处理器 - 打开系统浏览器登录 YouTube
+ipcMain.handle('open-youtube-login', async () => {
+  // 打开系统默认浏览器到 YouTube 登录页面
+  shell.openExternal('https://www.youtube.com/')
+  return { success: true, message: '已打开浏览器，请登录后导出 Cookies 文件' }
+})
+
+// IPC 处理器 - 导入 Cookies 文件
+ipcMain.handle('import-cookies-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: '选择 Cookies 文件',
+    filters: [
+      { name: 'Cookies 文件', extensions: ['txt'] },
+      { name: '所有文件', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  })
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { success: false, message: '未选择文件' }
+  }
+
+  try {
+    const sourcePath = result.filePaths[0]
+    const content = fs.readFileSync(sourcePath, 'utf-8')
+
+    // 验证是否是有效的 Netscape cookies 文件
+    if (!content.includes('.youtube.com') && !content.includes('.google.com')) {
+      return { success: false, message: 'Cookies 文件中未找到 YouTube 相关的 cookies' }
+    }
+
+    // 复制到应用数据目录
+    fs.writeFileSync(COOKIES_FILE_PATH, content, 'utf-8')
+    console.log(`Imported cookies from ${sourcePath} to ${COOKIES_FILE_PATH}`)
+
+    return { success: true, message: 'Cookies 导入成功' }
+  } catch (error) {
+    console.error('导入 Cookies 失败:', error)
+    return { success: false, message: (error as Error).message }
+  }
+})
+
+// IPC 处理器 - 检查 YouTube 登录状态
+ipcMain.handle('check-youtube-login', async () => {
+  try {
+    // 检查 cookies 文件是否存在
+    if (!fs.existsSync(COOKIES_FILE_PATH)) {
+      return { loggedIn: false }
+    }
+
+    // 检查文件是否有内容
+    const content = fs.readFileSync(COOKIES_FILE_PATH, 'utf-8')
+    const hasCookies = content.includes('youtube.com') && content.split('\n').length > 5
+
+    return { loggedIn: hasCookies }
+  } catch (error) {
+    console.error('检查登录状态失败:', error)
+    return { loggedIn: false }
+  }
+})
+
+// IPC 处理器 - 登出 YouTube（删除 cookies 文件）
+ipcMain.handle('logout-youtube', async () => {
+  try {
+    // 删除 cookies 文件
+    if (fs.existsSync(COOKIES_FILE_PATH)) {
+      fs.unlinkSync(COOKIES_FILE_PATH)
+    }
+    return { success: true }
+  } catch (error) {
+    console.error('登出失败:', error)
+    return { success: false, message: (error as Error).message }
+  }
+})
+
+// IPC 处理器 - 获取 cookies 文件路径
+ipcMain.handle('get-cookies-file-path', () => {
+  return COOKIES_FILE_PATH
 })

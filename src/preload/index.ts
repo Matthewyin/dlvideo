@@ -90,12 +90,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startDownload: (taskId: string, options: DownloadOptions) =>
     ipcRenderer.invoke('start-download', taskId, options),
 
-  // 暂停下载
-  pauseDownload: (taskId: string) => ipcRenderer.invoke('pause-download', taskId),
-
-  // 恢复下载
-  resumeDownload: (taskId: string) => ipcRenderer.invoke('resume-download', taskId),
-
   // 取消下载
   cancelDownload: (taskId: string) => ipcRenderer.invoke('cancel-download', taskId),
 
@@ -140,6 +134,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 获取历史记录数量
   getHistoryCount: () => ipcRenderer.invoke('get-history-count'),
 
+  // ============ YouTube 登录相关 API ============
+
+  // 打开系统浏览器登录 YouTube
+  openYouTubeLogin: () => ipcRenderer.invoke('open-youtube-login'),
+
+  // 导入 Cookies 文件
+  importCookiesFile: () => ipcRenderer.invoke('import-cookies-file'),
+
+  // 检查 YouTube 登录状态
+  checkYouTubeLogin: () => ipcRenderer.invoke('check-youtube-login'),
+
+  // 登出 YouTube
+  logoutYouTube: () => ipcRenderer.invoke('logout-youtube'),
+
+  // 获取 cookies 文件路径
+  getCookiesFilePath: () => ipcRenderer.invoke('get-cookies-file-path'),
+
   // 平台信息
   platform: process.platform,
 })
@@ -155,8 +166,6 @@ declare global {
       parseVideo: (url: string) => Promise<{ success: boolean; data?: any; isPlaylist?: boolean; error?: string }>
       parsePlaylist: (url: string) => Promise<{ success: boolean; data?: any; error?: string }>
       startDownload: (taskId: string, options: DownloadOptions) => Promise<{ success: boolean; error?: string }>
-      pauseDownload: (taskId: string) => Promise<boolean>
-      resumeDownload: (taskId: string) => Promise<boolean>
       cancelDownload: (taskId: string) => Promise<boolean>
       onDownloadProgress: (callback: (progress: DownloadProgress) => void) => () => void
       onDownloadComplete: (callback: (result: DownloadResult) => void) => () => void
@@ -169,6 +178,12 @@ declare global {
       deleteHistory: (id: string) => Promise<{ success: boolean; error?: string }>
       clearHistory: () => Promise<{ success: boolean; error?: string }>
       getHistoryCount: () => Promise<number>
+      // YouTube 登录相关
+      openYouTubeLogin: () => Promise<{ success: boolean; message?: string }>
+      importCookiesFile: () => Promise<{ success: boolean; message?: string }>
+      checkYouTubeLogin: () => Promise<{ loggedIn: boolean }>
+      logoutYouTube: () => Promise<{ success: boolean; message?: string }>
+      getCookiesFilePath: () => Promise<string>
       platform: NodeJS.Platform
     }
   }

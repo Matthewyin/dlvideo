@@ -4,6 +4,9 @@ import fs from 'fs'
 import { app } from 'electron'
 import { EventEmitter } from 'events'
 
+// Cookies 文件路径
+const COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'youtube_cookies.txt')
+
 // Cookies 来源浏览器类型
 export type CookiesBrowser = 'none' | 'chrome' | 'safari'
 
@@ -42,61 +45,57 @@ export interface DownloadResult {
 class DownloaderService extends EventEmitter {
   private activeDownloads: Map<string, ChildProcess> = new Map()
   private pausedDownloads: Map<string, DownloadOptions> = new Map()
-  private ytdlpPath: string = '/opt/homebrew/bin/yt-dlp' // macOS Homebrew 路径
+  private ytdlpPath: string = ''
+  private denoPath: string = ''
+  private aria2cPath: string = ''
+  private ffmpegPath: string = ''
 
   constructor() {
     super()
-    // 尝试找到 yt-dlp 的正确路径
-    this.findYtdlpPath()
+    // 设置二进制文件路径
+    this.setupPaths()
   }
 
-  private findYtdlpPath(): void {
-    const possiblePaths = [
-      '/opt/homebrew/bin/yt-dlp',  // macOS Homebrew (Apple Silicon)
-      '/usr/local/bin/yt-dlp',     // macOS Homebrew (Intel) / Linux
-      '/usr/bin/yt-dlp',           // Linux 系统安装
-      'yt-dlp',                    // PATH 中的 yt-dlp
-    ]
+  private setupPaths(): void {
+    const platform = process.platform
+    const ytdlpName = platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
+    const denoName = platform === 'win32' ? 'deno.exe' : 'deno'
+    const aria2cName = platform === 'win32' ? 'aria2c.exe' : 'aria2c'
+    const ffmpegName = platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
 
-    for (const p of possiblePaths) {
-      try {
-        const fs = require('fs')
-        if (p === 'yt-dlp' || fs.existsSync(p)) {
-          this.ytdlpPath = p
-          console.log(`Downloader using yt-dlp at: ${p}`)
-          return
-        }
-      } catch {
-        // 继续尝试
-      }
+    // 开发环境和生产环境的路径
+    if (app.isPackaged) {
+      this.ytdlpPath = path.join(process.resourcesPath, 'bin', ytdlpName)
+      this.denoPath = path.join(process.resourcesPath, 'bin', denoName)
+      this.aria2cPath = path.join(process.resourcesPath, 'bin', aria2cName)
+      this.ffmpegPath = path.join(process.resourcesPath, 'bin', ffmpegName)
+    } else {
+      this.ytdlpPath = path.join(app.getAppPath(), 'resources', 'bin', ytdlpName)
+      this.denoPath = path.join(app.getAppPath(), 'resources', 'bin', denoName)
+      this.aria2cPath = path.join(app.getAppPath(), 'resources', 'bin', aria2cName)
+      this.ffmpegPath = path.join(app.getAppPath(), 'resources', 'bin', ffmpegName)
     }
-  }
 
-  // 暂停下载
-  pauseDownload(taskId: string): boolean {
-    const process = this.activeDownloads.get(taskId)
-    if (process) {
-      process.kill('SIGSTOP')
-      return true
-    }
-    return false
-  }
-
-  // 恢复下载
-  resumeDownload(taskId: string): boolean {
-    const process = this.activeDownloads.get(taskId)
-    if (process) {
-      process.kill('SIGCONT')
-      return true
-    }
-    return false
+    console.log(`Downloader using yt-dlp at: ${this.ytdlpPath}`)
+    console.log(`Downloader using deno at: ${this.denoPath}`)
+    console.log(`Downloader using aria2c at: ${this.aria2cPath}`)
+    console.log(`Downloader using ffmpeg at: ${this.ffmpegPath}`)
   }
 
   // 取消下载
   cancelDownload(taskId: string): boolean {
     const process = this.activeDownloads.get(taskId)
     if (process) {
+      // 先尝试优雅终止
       process.kill('SIGTERM')
+      // 500ms 后强制杀死进程
+      setTimeout(() => {
+        try {
+          process.kill('SIGKILL')
+        } catch {
+          // 进程可能已经退出
+        }
+      }, 500)
       this.activeDownloads.delete(taskId)
       return true
     }
@@ -206,10 +205,24 @@ class DownloaderService extends EventEmitter {
       '-c', // 断点续传：继续下载部分下载的文件
       '--no-part', // 不使用.part临时文件，直接写入目标文件
       '--no-check-certificates', // 跳过证书检查
+      '--js-runtimes', `deno:${this.denoPath}`, // 使用内置 Deno 解决 YouTube n parameter challenge
+      '--concurrent-fragments', '8', // 并行下载8个片段，加速下载
+      '--retries', '10', // 重试次数
+      '--fragment-retries', '10', // 片段重试次数
+      '--no-playlist', // 不处理播放列表，加速单视频下载
+      '--no-warnings', // 不显示警告信息
+      // ffmpeg 配置：用于合并视频+音频+字幕
+      '--ffmpeg-location', this.ffmpegPath,
+      // aria2c 高速下载配置
+      '--downloader', `aria2c:${this.aria2cPath}`, // 使用内置 aria2c 作为下载器
+      '--downloader-args', 'aria2c:-x 16 -s 16 -k 1M --file-allocation=none', // aria2c 参数：16连接、16分段、1M块大小
     ]
 
-    // 根据设置添加 cookies 参数
-    if (cookiesBrowser && cookiesBrowser !== 'none') {
+    // 优先使用本地 cookies 文件（App 内登录）
+    if (fs.existsSync(COOKIES_FILE_PATH)) {
+      args.push('--cookies', COOKIES_FILE_PATH)
+    } else if (cookiesBrowser && cookiesBrowser !== 'none') {
+      // 否则使用浏览器 cookies
       args.push('--cookies-from-browser', cookiesBrowser)
     }
 
@@ -223,9 +236,16 @@ class DownloaderService extends EventEmitter {
       args.push('-f', 'bestvideo+bestaudio/best')
     }
 
-    // 字幕
-    if (subtitles) {
-      args.push('--write-subs', '--sub-lang', subtitleLang || 'en')
+    // 默认下载字幕并嵌入到视频文件中（如果视频有字幕的话）
+    if (!audioOnly) {
+      args.push(
+        '--write-subs', // 下载字幕
+        '--write-auto-subs', // 也下载自动生成的字幕
+        '--sub-lang', subtitleLang || 'en,zh-Hans,zh-Hant', // 默认下载英文和中文字幕
+        '--embed-subs', // 将字幕嵌入到视频文件中
+        '--embed-thumbnail', // 将缩略图嵌入到视频文件中
+        '--embed-metadata', // 将元数据嵌入到视频文件中
+      )
     }
 
     // 代理设置
@@ -233,9 +253,12 @@ class DownloaderService extends EventEmitter {
       args.push('--proxy', proxyUrl)
     }
 
-    // 格式转换
-    if (convertFormat && !audioOnly) {
-      args.push('--recode-video', convertFormat)
+    // 格式转换（默认输出 mp4 以确保兼容性和字幕嵌入）
+    if (!audioOnly) {
+      args.push('--merge-output-format', 'mp4') // 强制输出 mp4 格式
+      if (convertFormat && convertFormat !== 'mp4') {
+        args.push('--recode-video', convertFormat)
+      }
     }
 
     // 启动下载进程

@@ -2,8 +2,12 @@ import YTDlpWrapModule from 'yt-dlp-wrap'
 // 处理 ESM/CJS 兼容性问题
 const YTDlpWrap = (YTDlpWrapModule as any).default || YTDlpWrapModule
 import path from 'path'
+import fs from 'fs'
 import { app } from 'electron'
 import { EventEmitter } from 'events'
+
+// Cookies 文件路径
+const COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'youtube_cookies.txt')
 
 // 视频格式信息
 export interface VideoFormat {
@@ -60,19 +64,28 @@ export interface DownloadProgress {
 class YtdlpService extends EventEmitter {
   private ytdlp: YTDlpWrap | null = null
   private binaryPath: string
+  private denoPath: string
 
   constructor() {
     super()
     // 根据平台确定二进制文件路径
     const platform = process.platform
     const binaryName = platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
-    
+    const denoName = platform === 'win32' ? 'deno.exe' : 'deno'
+
     // 开发环境和生产环境的路径
     if (app.isPackaged) {
       this.binaryPath = path.join(process.resourcesPath, 'bin', binaryName)
+      this.denoPath = path.join(process.resourcesPath, 'bin', denoName)
     } else {
       this.binaryPath = path.join(app.getAppPath(), 'resources', 'bin', binaryName)
+      this.denoPath = path.join(app.getAppPath(), 'resources', 'bin', denoName)
     }
+  }
+
+  // 获取 Deno 路径
+  getDenoPath(): string {
+    return this.denoPath
   }
 
   // 初始化 yt-dlp
@@ -150,14 +163,21 @@ class YtdlpService extends EventEmitter {
       await this.initialize()
     }
 
-    // 构建参数，根据设置决定是否添加 cookies
-    const args: string[] = [url, '--no-check-certificates']
-    if (cookiesBrowser && cookiesBrowser !== 'none') {
+    // 构建参数，不使用 -f best（避免 yt-dlp-wrap 自动添加导致的问题）
+    // 使用内置 Deno 解决 YouTube n parameter challenge
+    const args: string[] = [url, '--dump-json', '--no-warnings', '--no-check-certificates', '--js-runtimes', `deno:${this.denoPath}`]
+
+    // 优先使用本地 cookies 文件（App 内登录）
+    if (fs.existsSync(COOKIES_FILE_PATH)) {
+      args.push('--cookies', COOKIES_FILE_PATH)
+    } else if (cookiesBrowser && cookiesBrowser !== 'none') {
+      // 否则使用浏览器 cookies
       args.push('--cookies-from-browser', cookiesBrowser)
     }
 
-    // 添加 cookies 支持以绕过 YouTube 机器人验证
-    const metadata = await this.ytdlp!.getVideoInfo(args)
+    // 直接使用 execPromise 避免 yt-dlp-wrap 自动添加 -f best
+    const stdout = await this.ytdlp!.execPromise(args)
+    const metadata = JSON.parse(stdout)
 
     return {
       id: metadata.id,
@@ -187,13 +207,35 @@ class YtdlpService extends EventEmitter {
     }
 
     // 构建参数，根据设置决定是否添加 cookies
-    const args: string[] = [url, '--flat-playlist', '--yes-playlist', '--no-check-certificates']
-    if (cookiesBrowser && cookiesBrowser !== 'none') {
+    // 使用内置 Deno 解决 YouTube n parameter challenge
+    const args: string[] = [url, '--flat-playlist', '--yes-playlist', '--dump-json', '--no-warnings', '--no-check-certificates', '--js-runtimes', `deno:${this.denoPath}`]
+
+    // 优先使用本地 cookies 文件（App 内登录）
+    if (fs.existsSync(COOKIES_FILE_PATH)) {
+      args.push('--cookies', COOKIES_FILE_PATH)
+    } else if (cookiesBrowser && cookiesBrowser !== 'none') {
+      // 否则使用浏览器 cookies
       args.push('--cookies-from-browser', cookiesBrowser)
     }
 
-    // 使用 --flat-playlist 只获取列表信息不下载，添加 cookies 支持
-    const metadata = await this.ytdlp!.getVideoInfo(args)
+    // 直接使用 execPromise 避免 yt-dlp-wrap 自动添加 -f best
+    const stdout = await this.ytdlp!.execPromise(args)
+    // 播放列表可能返回多行 JSON
+    let metadata: any
+    try {
+      metadata = JSON.parse(stdout)
+    } catch {
+      // 多行 JSON 的情况
+      metadata = JSON.parse('[' + stdout.replace(/\n/g, ',').slice(0, -1) + ']')
+      if (Array.isArray(metadata)) {
+        // 将数组转换为带数字键的对象
+        const obj: any = {}
+        metadata.forEach((item, index) => {
+          obj[index] = item
+        })
+        metadata = obj
+      }
+    }
 
     // yt-dlp-wrap 在处理播放列表时返回格式异常：
     // - 返回对象的 keys 是数字字符串 ('0', '1', '2', ...)

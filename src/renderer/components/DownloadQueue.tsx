@@ -1,25 +1,10 @@
 import React, { useEffect } from 'react'
-import { Play, Pause, X, FolderOpen, RotateCcw, CheckCircle, AlertCircle, Clock, Loader2 } from 'lucide-react'
+import { X, FolderOpen, RotateCcw, CheckCircle, AlertCircle, Clock, Loader2 } from 'lucide-react'
 import { useDownloadStore, DownloadTask } from '../stores/downloadStore'
 
 // 单个下载任务项
 const DownloadItem: React.FC<{ task: DownloadTask }> = ({ task }) => {
   const { updateTask, removeFromQueue } = useDownloadStore()
-
-  // 暂停/继续
-  const togglePause = async () => {
-    if (task.status === 'downloading') {
-      const success = await window.electronAPI.pauseDownload(task.id)
-      if (success) {
-        updateTask(task.id, { status: 'paused' })
-      }
-    } else if (task.status === 'paused') {
-      const success = await window.electronAPI.resumeDownload(task.id)
-      if (success) {
-        updateTask(task.id, { status: 'downloading' })
-      }
-    }
-  }
 
   // 重试
   const retry = () => {
@@ -31,9 +16,9 @@ const DownloadItem: React.FC<{ task: DownloadTask }> = ({ task }) => {
     switch (task.status) {
       case 'pending': return <Clock className="w-5 h-5 text-gray-400" />
       case 'downloading': return <Loader2 className="w-5 h-5 text-info animate-spin" />
-      case 'paused': return <Pause className="w-5 h-5 text-warning" />
       case 'completed': return <CheckCircle className="w-5 h-5 text-success" />
       case 'failed': return <AlertCircle className="w-5 h-5 text-error" />
+      default: return <Clock className="w-5 h-5 text-gray-400" />
     }
   }
 
@@ -41,10 +26,9 @@ const DownloadItem: React.FC<{ task: DownloadTask }> = ({ task }) => {
   const progressColor = {
     pending: 'bg-gray-500',
     downloading: 'bg-info',
-    paused: 'bg-warning',
     completed: 'bg-success',
     failed: 'bg-error',
-  }[task.status]
+  }[task.status] || 'bg-gray-500'
 
   return (
     <div className="bg-surface-secondary rounded-lg p-4 border border-border shadow-soft card-hover">
@@ -74,20 +58,12 @@ const DownloadItem: React.FC<{ task: DownloadTask }> = ({ task }) => {
               </>
             )}
             {task.status === 'completed' && <span className="text-success">下载完成</span>}
-            {task.status === 'paused' && <span className="text-warning">已暂停</span>}
             {task.status === 'failed' && <span className="text-error">{task.error || '下载失败'}</span>}
           </div>
         </div>
 
         {/* 操作按钮 */}
         <div className="flex items-center gap-2">
-          {(task.status === 'downloading' || task.status === 'paused') && (
-            <button onClick={togglePause}
-              className="p-2 rounded-lg bg-surface-tertiary hover:bg-surface-hover text-text-secondary hover:text-text-primary transition-colors">
-              {task.status === 'downloading' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            </button>
-          )}
-
           {task.status === 'completed' && task.filePath && (
             <button
               onClick={() => window.electronAPI.showItemInFolder(task.filePath!)}
@@ -108,7 +84,7 @@ const DownloadItem: React.FC<{ task: DownloadTask }> = ({ task }) => {
           <button
             onClick={async () => {
               // 如果正在下载，先取消下载
-              if (task.status === 'downloading' || task.status === 'paused' || task.status === 'pending') {
+              if (task.status === 'downloading' || task.status === 'pending') {
                 await window.electronAPI.cancelDownload(task.id)
               }
               removeFromQueue(task.id)

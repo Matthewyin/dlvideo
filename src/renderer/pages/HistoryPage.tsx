@@ -1,0 +1,179 @@
+import React, { useState, useEffect, useCallback } from 'react'
+import { ArrowLeft, Search, FolderOpen, Trash2, Download, Loader2 } from 'lucide-react'
+import { useDownloadStore } from '../stores/downloadStore'
+
+export const HistoryPage: React.FC = () => {
+  const { setCurrentPage, historyList, historyLoading, loadHistory, removeFromHistory, clearAllHistory, searchHistory } = useDownloadStore()
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all')
+
+  // 加载历史记录
+  useEffect(() => {
+    loadHistory()
+  }, [loadHistory])
+
+  // 搜索防抖
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchHistory(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery, searchHistory])
+
+  // 过滤结果
+  const filteredHistory = historyList.filter(item => {
+    if (filterType === 'video') return item.ext !== 'mp3'
+    if (filterType === 'audio') return item.ext === 'mp3'
+    return true
+  })
+
+  // 按日期分组
+  const groupByDate = useCallback((items: typeof historyList) => {
+    const groups: Record<string, typeof historyList> = {}
+    const today = new Date().toDateString()
+    const yesterday = new Date(Date.now() - 86400000).toDateString()
+
+    items.forEach(item => {
+      const date = new Date(item.downloadedAt).toDateString()
+      let label: string
+      if (date === today) label = '今天'
+      else if (date === yesterday) label = '昨天'
+      else label = new Date(item.downloadedAt).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
+
+      if (!groups[label]) groups[label] = []
+      groups[label].push(item)
+    })
+    return groups
+  }, [])
+
+  const groupedHistory = groupByDate(filteredHistory)
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto">
+      <div className="flex items-center gap-4 mb-8">
+        <button
+          onClick={() => setCurrentPage('home')}
+          className="p-2 rounded-lg bg-surface-secondary border border-border hover:bg-surface-hover transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-text-secondary" />
+        </button>
+        <h1 className="text-2xl font-bold text-text-primary">下载历史</h1>
+      </div>
+
+      {/* 搜索和筛选 */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="搜索视频..."
+            className="w-full pl-11 pr-4 py-2.5 bg-surface-secondary border border-border rounded-lg text-text-primary text-sm placeholder-text-tertiary focus:outline-none focus:border-primary shadow-soft"
+          />
+        </div>
+        <select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value as typeof filterType)}
+          className="px-4 py-2.5 bg-surface-secondary border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-primary"
+        >
+          <option value="all">全部</option>
+          <option value="video">视频</option>
+          <option value="audio">音频</option>
+        </select>
+        {historyList.length > 0 && (
+          <button
+            onClick={clearAllHistory}
+            className="px-4 py-2.5 bg-surface-secondary hover:bg-red-50 hover:text-error border border-border rounded-lg text-sm text-text-secondary transition-colors"
+          >
+            清空历史
+          </button>
+        )}
+      </div>
+
+      {/* 历史记录列表 */}
+      {historyLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      ) : filteredHistory.length === 0 ? (
+        <div className="text-center py-16">
+          <Download className="w-16 h-16 mx-auto mb-4 text-text-tertiary" />
+          <p className="text-text-secondary text-lg">
+            {searchQuery ? '没有找到匹配的记录' : '暂无下载历史'}
+          </p>
+          <p className="text-text-tertiary text-sm mt-2">
+            {searchQuery ? '尝试其他关键词' : '完成的下载将显示在这里'}
+          </p>
+          {!searchQuery && (
+            <button
+              onClick={() => setCurrentPage('home')}
+              className="mt-6 px-6 py-2.5 bg-primary hover:bg-primary-hover text-text-inverse rounded-lg font-medium transition-colors shadow-soft"
+            >
+              开始下载
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(groupedHistory).map(([dateLabel, items]) => (
+            <div key={dateLabel}>
+              <div className="text-sm text-text-tertiary font-medium mb-3">{dateLabel}</div>
+              <div className="space-y-3">
+                {items.map(item => (
+                  <div key={item.id} className="bg-surface-secondary rounded-xl p-4 border border-border shadow-soft card-hover">
+                    <div className="flex items-center gap-4">
+                      {/* 缩略图 */}
+                      <div className="w-24 h-14 rounded-lg overflow-hidden bg-surface-tertiary flex-shrink-0">
+                        <img
+                          src={item.thumbnail}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 9"><rect fill="%23E2E8F0" width="16" height="9"/></svg>'
+                          }}
+                        />
+                      </div>
+
+                      {/* 信息 */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">
+                          {item.title}
+                        </p>
+                        <p className="text-xs text-text-tertiary mt-1">
+                          {item.ext.toUpperCase()} · {item.resolution} · {item.channel} ·
+                          {new Date(item.downloadedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+
+                      {/* 操作按钮 */}
+                      <div className="flex items-center gap-2">
+                        {item.filePath && (
+                          <button
+                            onClick={() => window.electronAPI.showItemInFolder(item.filePath)}
+                            className="p-2 rounded-lg bg-surface-tertiary hover:bg-surface-hover text-text-secondary transition-colors"
+                            title="打开文件夹"
+                          >
+                            <FolderOpen className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeFromHistory(item.id)}
+                          className="p-2 rounded-lg bg-surface-tertiary hover:bg-red-50 text-text-secondary hover:text-error transition-colors"
+                          title="删除记录"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+

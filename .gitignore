@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+release/
+build/*.icns
+build/*.ico
+
+# yt-dlp binary (users should download themselves or use bundled version)
+resources/bin/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Cache
+.cache/
+.npm/
+
+# AI Agent skills (not part of the project)
+.agent/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Documentation (local only)
+*.docx
+

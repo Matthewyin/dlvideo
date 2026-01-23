@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 基础样式 - 亮色主题 */
+:root {
+  --bg-primary: #F5F7FA;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #EEF2F6;
+  --text-primary: #1A202C;
+  --text-secondary: #64748B;
+  --border-color: #E2E8F0;
+}
+
+/* 自定义滚动条 - 亮色风格 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #EEF2F6;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* 禁止文本选择（桌面应用风格） */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+}
+
+/* 允许输入框和错误信息文本选择 */
+input, textarea, .selectable-text {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* 窗口拖拽区域 */
+.app-drag-region {
+  -webkit-app-region: drag;
+}
+
+/* 非拖拽区域（按钮等可交互元素） */
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* 进度条动画 */
+@keyframes progress-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.progress-animate {
+  animation: progress-pulse 1.5s ease-in-out infinite;
+}
+
+/* 卡片悬停效果 */
+.card-hover {
+  @apply transition-all duration-200 ease-out;
+}
+
+.card-hover:hover {
+  @apply transform scale-[1.01] shadow-lg;
+}
+
+/* 按钮点击效果 */
+.btn-press:active {
+  @apply transform scale-[0.98];
+}
+

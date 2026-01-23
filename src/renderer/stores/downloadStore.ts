@@ -44,6 +44,9 @@ export interface DownloadTask {
   createdAt: Date
 }
 
+// Cookies 来源浏览器类型
+export type CookiesBrowser = 'none' | 'chrome' | 'safari'
+
 // 设置类型
 export interface Settings {
   downloadPath: string
@@ -55,6 +58,7 @@ export interface Settings {
   theme: 'light' | 'dark' | 'system'
   proxyEnabled: boolean
   proxyUrl: string
+  cookiesBrowser: CookiesBrowser // Cookies 来源浏览器
 }
 
 // 历史记录类型（来自数据库）
@@ -154,6 +158,7 @@ const defaultSettings: Settings = {
   theme: 'dark',
   proxyEnabled: false,
   proxyUrl: '',
+  cookiesBrowser: 'chrome', // 默认使用 Chrome 的 cookies
 }
 
 // 初始化应用（加载设置和默认下载路径）

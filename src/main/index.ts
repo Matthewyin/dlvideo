@@ -108,12 +108,15 @@ ipcMain.handle('get-default-download-path', () => {
 // IPC 处理器 - 解析视频信息
 ipcMain.handle('parse-video', async (_, url: string) => {
   try {
+    // 获取 cookies 浏览器设置
+    const cookiesBrowser = databaseService.getSetting('cookiesBrowser') || 'chrome'
+
     // 检测是否为播放列表
     if (ytdlpService.isPlaylistUrl(url)) {
-      const playlistInfo = await ytdlpService.getPlaylistInfo(url)
+      const playlistInfo = await ytdlpService.getPlaylistInfo(url, cookiesBrowser)
       return { success: true, data: playlistInfo, isPlaylist: true }
     }
-    const videoInfo = await ytdlpService.getVideoInfo(url)
+    const videoInfo = await ytdlpService.getVideoInfo(url, cookiesBrowser)
     return { success: true, data: videoInfo, isPlaylist: false }
   } catch (error) {
     return {
@@ -126,7 +129,9 @@ ipcMain.handle('parse-video', async (_, url: string) => {
 // IPC 处理器 - 获取播放列表信息
 ipcMain.handle('parse-playlist', async (_, url: string) => {
   try {
-    const playlistInfo = await ytdlpService.getPlaylistInfo(url)
+    // 获取 cookies 浏览器设置
+    const cookiesBrowser = databaseService.getSetting('cookiesBrowser') || 'chrome'
+    const playlistInfo = await ytdlpService.getPlaylistInfo(url, cookiesBrowser)
     return { success: true, data: playlistInfo }
   } catch (error) {
     return {
@@ -139,8 +144,12 @@ ipcMain.handle('parse-playlist', async (_, url: string) => {
 // IPC 处理器 - 开始下载
 ipcMain.handle('start-download', async (_, taskId: string, options: DownloadOptions) => {
   try {
+    // 获取 cookies 浏览器设置并添加到选项中
+    const cookiesBrowser = databaseService.getSetting('cookiesBrowser') || 'chrome'
+    const optionsWithCookies = { ...options, cookiesBrowser }
+
     // 异步启动下载，不等待完成
-    downloaderService.startDownload(taskId, options).catch(err => {
+    downloaderService.startDownload(taskId, optionsWithCookies).catch(err => {
       console.error(`Download ${taskId} failed:`, err)
     })
     return { success: true }

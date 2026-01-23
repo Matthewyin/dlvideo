@@ -21,6 +21,9 @@ export interface HistoryItem {
   url: string
 }
 
+// Cookies 来源浏览器类型
+export type CookiesBrowser = 'none' | 'chrome' | 'safari'
+
 // 设置接口
 export interface AppSettings {
   downloadPath: string
@@ -32,6 +35,7 @@ export interface AppSettings {
   theme: 'light' | 'dark' | 'system'
   proxyEnabled: boolean
   proxyUrl: string
+  cookiesBrowser: CookiesBrowser
 }
 
 class DatabaseService {

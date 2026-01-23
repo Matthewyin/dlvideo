@@ -145,17 +145,19 @@ class YtdlpService extends EventEmitter {
   }
 
   // 获取视频信息
-  async getVideoInfo(url: string): Promise<VideoInfo> {
+  async getVideoInfo(url: string, cookiesBrowser: string = 'chrome'): Promise<VideoInfo> {
     if (!this.ytdlp) {
       await this.initialize()
     }
 
+    // 构建参数，根据设置决定是否添加 cookies
+    const args: string[] = [url, '--no-check-certificates']
+    if (cookiesBrowser && cookiesBrowser !== 'none') {
+      args.push('--cookies-from-browser', cookiesBrowser)
+    }
+
     // 添加 cookies 支持以绕过 YouTube 机器人验证
-    const metadata = await this.ytdlp!.getVideoInfo([
-      url,
-      '--cookies-from-browser', 'chrome',  // 从 Chrome 浏览器获取 cookies
-      '--no-check-certificates',
-    ])
+    const metadata = await this.ytdlp!.getVideoInfo(args)
 
     return {
       id: metadata.id,
@@ -179,19 +181,19 @@ class YtdlpService extends EventEmitter {
   }
 
   // 获取播放列表信息
-  async getPlaylistInfo(url: string): Promise<PlaylistInfo> {
+  async getPlaylistInfo(url: string, cookiesBrowser: string = 'chrome'): Promise<PlaylistInfo> {
     if (!this.ytdlp) {
       await this.initialize()
     }
 
+    // 构建参数，根据设置决定是否添加 cookies
+    const args: string[] = [url, '--flat-playlist', '--yes-playlist', '--no-check-certificates']
+    if (cookiesBrowser && cookiesBrowser !== 'none') {
+      args.push('--cookies-from-browser', cookiesBrowser)
+    }
+
     // 使用 --flat-playlist 只获取列表信息不下载，添加 cookies 支持
-    const metadata = await this.ytdlp!.getVideoInfo([
-      url,
-      '--flat-playlist',
-      '--yes-playlist',
-      '--cookies-from-browser', 'chrome',
-      '--no-check-certificates',
-    ])
+    const metadata = await this.ytdlp!.getVideoInfo(args)
 
     // yt-dlp-wrap 在处理播放列表时返回格式异常：
     // - 返回对象的 keys 是数字字符串 ('0', '1', '2', ...)

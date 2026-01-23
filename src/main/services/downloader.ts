@@ -4,6 +4,9 @@ import fs from 'fs'
 import { app } from 'electron'
 import { EventEmitter } from 'events'
 
+// Cookies 来源浏览器类型
+export type CookiesBrowser = 'none' | 'chrome' | 'safari'
+
 // 下载选项
 export interface DownloadOptions {
   url: string
@@ -15,6 +18,7 @@ export interface DownloadOptions {
   subtitleLang?: string
   proxyUrl?: string // 代理地址
   convertFormat?: string // 转换目标格式 (mp4, mkv, webm, mp3, m4a)
+  cookiesBrowser?: CookiesBrowser // Cookies 来源浏览器
 }
 
 // 下载进度
@@ -179,7 +183,7 @@ class DownloaderService extends EventEmitter {
 
   // 开始下载
   async startDownload(taskId: string, options: DownloadOptions): Promise<void> {
-    const { url, outputPath, filename, formatId, audioOnly, subtitles, subtitleLang, proxyUrl, convertFormat } = options
+    const { url, outputPath, filename, formatId, audioOnly, subtitles, subtitleLang, proxyUrl, convertFormat, cookiesBrowser } = options
 
     // 确保输出目录存在
     if (!fs.existsSync(outputPath)) {
@@ -201,9 +205,13 @@ class DownloaderService extends EventEmitter {
       '--no-colors', // 禁用颜色输出
       '-c', // 断点续传：继续下载部分下载的文件
       '--no-part', // 不使用.part临时文件，直接写入目标文件
-      '--cookies-from-browser', 'chrome', // 从 Chrome 获取 cookies 绕过机器人验证
       '--no-check-certificates', // 跳过证书检查
     ]
+
+    // 根据设置添加 cookies 参数
+    if (cookiesBrowser && cookiesBrowser !== 'none') {
+      args.push('--cookies-from-browser', cookiesBrowser)
+    }
 
     // 格式选择
     if (audioOnly) {

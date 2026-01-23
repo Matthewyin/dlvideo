@@ -31,6 +31,9 @@ interface HistoryItem {
   url: string
 }
 
+// Cookies 来源浏览器类型
+type CookiesBrowser = 'none' | 'chrome' | 'safari'
+
 // 设置接口
 interface AppSettings {
   downloadPath: string
@@ -42,6 +45,7 @@ interface AppSettings {
   theme: 'light' | 'dark' | 'system'
   proxyEnabled: boolean
   proxyUrl: string
+  cookiesBrowser: CookiesBrowser
 }
 
 // 下载进度接口

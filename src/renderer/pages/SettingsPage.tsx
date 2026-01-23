@@ -114,6 +114,22 @@ export const SettingsPage: React.FC = () => {
             <h2 className="text-lg font-semibold text-text-primary">网络设置</h2>
           </div>
           <div className="bg-surface-secondary rounded-xl p-5 space-y-4 border border-border shadow-soft">
+            {/* Cookies 来源浏览器 */}
+            <div>
+              <label className="block text-sm text-text-secondary mb-2">Cookies 来源浏览器</label>
+              <select
+                value={settings.cookiesBrowser || 'chrome'}
+                onChange={(e) => handleUpdateSettings({ cookiesBrowser: e.target.value as 'none' | 'chrome' | 'safari' })}
+                className="w-full px-4 py-2.5 bg-surface-tertiary border border-border rounded-lg text-text-primary text-sm focus:outline-none focus:border-primary"
+              >
+                <option value="none">不使用</option>
+                <option value="chrome">Chrome</option>
+                <option value="safari">Safari</option>
+              </select>
+              <p className="text-xs text-text-tertiary mt-2">从浏览器获取登录 Cookies 以绕过 YouTube 机器人验证</p>
+            </div>
+
+            {/* 代理设置 */}
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Clock, User, Eye, Calendar, Download, Music, Subtitles, RefreshCw } from 'lucide-react'
+import { Clock, User, Eye, Calendar, Download, Music, Subtitles, RefreshCw, X } from 'lucide-react'
 import { useDownloadStore, VideoFormat, DownloadTask } from '../stores/downloadStore'
 
 // 常用字幕语言
@@ -25,7 +25,7 @@ const VIDEO_CONVERT_FORMATS = [
 ]
 
 export const VideoPreview: React.FC = () => {
-  const { currentVideoInfo, addToQueue, parseError, settings, updateTask } = useDownloadStore()
+  const { currentVideoInfo, addToQueue, parseError, settings, updateTask, setCurrentVideoInfo } = useDownloadStore()
   const [selectedFormat, setSelectedFormat] = useState<string>('mp4')
   const [selectedResolution, setSelectedResolution] = useState<string>('')
   const [audioOnly, setAudioOnly] = useState(false)
@@ -155,8 +155,16 @@ export const VideoPreview: React.FC = () => {
   const currentFormat = formats.find(f => f.resolution === selectedResolution)
 
   return (
-    <div className="bg-surface-secondary rounded-xl p-6 border border-border shadow-card">
-      <div className="flex gap-6">
+    <div className="bg-surface-secondary rounded-xl p-6 border border-border shadow-card relative">
+      {/* 关闭按钮 */}
+      <button
+        onClick={() => setCurrentVideoInfo(null)}
+        className="absolute top-4 right-4 p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors z-10"
+        title="关闭"
+      >
+        <X className="w-5 h-5" />
+      </button>
+      <div className="flex gap-6 pr-8">
         {/* 缩略图 */}
         <div className="relative flex-shrink-0 w-64 h-36 rounded-lg overflow-hidden bg-surface-tertiary">
           <img src={thumbnail} alt={title} className="w-full h-full object-cover"

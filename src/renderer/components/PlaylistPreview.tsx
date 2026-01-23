@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Clock, User, ListVideo, Download, CheckSquare, Square, Music } from 'lucide-react'
+import { Clock, User, ListVideo, Download, CheckSquare, Square, Music, X } from 'lucide-react'
 import { useDownloadStore, VideoInfo, DownloadTask } from '../stores/downloadStore'
 
 export const PlaylistPreview: React.FC = () => {
@@ -12,6 +12,7 @@ export const PlaylistPreview: React.FC = () => {
     addBatchToQueue,
     updateTask,
     settings,
+    setCurrentPlaylist,
   } = useDownloadStore()
 
   const [audioOnly, setAudioOnly] = useState(false)
@@ -91,9 +92,17 @@ export const PlaylistPreview: React.FC = () => {
   }
 
   return (
-    <div className="bg-surface-secondary rounded-xl p-6 border border-border shadow-soft">
+    <div className="bg-surface-secondary rounded-xl p-6 border border-border shadow-soft relative">
+      {/* 关闭按钮 */}
+      <button
+        onClick={() => setCurrentPlaylist(null)}
+        className="absolute top-4 right-4 p-1.5 rounded-lg text-text-tertiary hover:text-text-primary hover:bg-surface-hover transition-colors"
+        title="关闭"
+      >
+        <X className="w-5 h-5" />
+      </button>
       {/* 播放列表信息头部 */}
-      <div className="flex gap-6 mb-6">
+      <div className="flex gap-6 mb-6 pr-8">
         <div className="relative flex-shrink-0 w-48 h-28 rounded-lg overflow-hidden bg-surface-tertiary">
           <img src={thumbnail} alt={title} className="w-full h-full object-cover" />
           <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-0.5 rounded text-xs flex items-center gap-1">

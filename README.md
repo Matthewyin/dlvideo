@@ -4,13 +4,15 @@
 
 ## ✨ 功能特性
 
-- 🎬 **视频下载** - 支持多种分辨率和格式（MP4、MKV、WebM）
-- 🎵 **音频提取** - 仅下载音频，自动转换为 MP3
+- 🎬 **高速下载** - 内置 aria2c 多线程下载，速度提升 3-5 倍
+- 🎵 **视频音频合并** - 自动合并视频和音频为单个 MP4 文件
+- 📝 **字幕嵌入** - 默认下载并嵌入字幕（英文/中文），支持多语言
+- 🎞️ **元数据嵌入** - 自动嵌入缩略图和视频元数据
 - 📁 **播放列表** - 批量下载整个播放列表，支持选择性下载
-- 📝 **字幕下载** - 支持多语言字幕下载
-- 🔄 **格式转换** - 下载后自动转换为指定格式
+- 🔄 **格式转换** - 支持多种格式转换（MP4、MKV、WebM）
 - 🌐 **代理支持** - 支持 HTTP/SOCKS 代理配置
 - 📜 **下载历史** - 记录下载历史，方便查找
+- 🔐 **Cookies 管理** - 支持导入 Cookies 用于受限视频下载
 
 ## 🛠 技术栈
 
@@ -21,6 +23,9 @@
 - **Tailwind CSS** - 样式框架
 - **Zustand** - 状态管理
 - **yt-dlp** - YouTube 下载核心（已内置）
+- **ffmpeg** - 视频音频处理（已内置）
+- **aria2c** - 高速多线程下载（已内置）
+- **Deno** - JavaScript 运行时（已内置，用于解决 YouTube JS challenge）
 - **better-sqlite3** - 本地数据库
 
 ## 📦 安装
@@ -28,6 +33,10 @@
 ### 从 Release 下载
 
 前往 [Releases](https://github.com/Matthewyin/dlyoutube/releases) 页面下载最新版本的安装包。
+
+**系统要求：**
+- macOS 10.13 或更高版本（ARM64/Intel）
+- 约 300MB 磁盘空间（包含内置工具）
 
 ### 从源码构建
 
@@ -66,11 +75,16 @@ npm run electron:build
 
 - **下载路径** - 视频保存位置
 - **代理服务器** - HTTP/SOCKS 代理地址（如 `http://127.0.0.1:7890`）
+- **Cookies 来源** - 选择浏览器或手动导入 Cookies 文件
 
-## 📋 系统要求
+## 🔐 Cookies 管理
 
-- macOS 10.13 或更高版本（当前仅支持 macOS）
-- 约 200MB 磁盘空间
+对于受限制的视频（需要登录或年龄验证），可以：
+
+1. **浏览器导入** - 从 Chrome/Safari 自动导入 Cookies
+2. **手动导入** - 使用浏览器扩展导出 Cookies 文件后导入
+
+推荐使用 **"Get cookies.txt LOCALLY"** 扩展导出 Cookies。
 
 ## 🔧 开发
 
@@ -98,5 +112,7 @@ MIT License
 ## 🙏 致谢
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) - 强大的视频下载工具
+- [ffmpeg](https://ffmpeg.org/) - 视频处理工具
+- [aria2](https://aria2.github.io/) - 高速下载工具
+- [Deno](https://deno.com/) - JavaScript 运行时
 - [Electron](https://www.electronjs.org/) - 跨平台桌面应用框架
-

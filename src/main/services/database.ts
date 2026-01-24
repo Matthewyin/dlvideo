@@ -32,10 +32,11 @@ export interface AppSettings {
   maxConcurrentDownloads: number
   autoDetectClipboard: boolean
   showNotifications: boolean
-  theme: 'light' | 'dark' | 'system'
   proxyEnabled: boolean
   proxyUrl: string
   cookiesBrowser: CookiesBrowser
+  // B站相关设置
+  bilibiliCookiesImported: boolean
 }
 
 class DatabaseService {
@@ -45,7 +46,7 @@ class DatabaseService {
   constructor() {
     // 数据库文件存放在用户数据目录
     const userDataPath = app.getPath('userData')
-    this.dbPath = path.join(userDataPath, 'dlyoutube.db')
+    this.dbPath = path.join(userDataPath, 'dlvideo.db')
   }
 
   // 初始化数据库

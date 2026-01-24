@@ -7,7 +7,22 @@ import { app } from 'electron'
 import { EventEmitter } from 'events'
 
 // Cookies 文件路径
-const COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'youtube_cookies.txt')
+const YOUTUBE_COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'youtube_cookies.txt')
+const BILIBILI_COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'bilibili_cookies.txt')
+
+// 平台类型
+export type Platform = 'youtube' | 'bilibili' | 'unknown'
+
+// 检测 URL 对应的平台
+export function detectPlatform(url: string): Platform {
+  if (/youtube\.com|youtu\.be/i.test(url)) {
+    return 'youtube'
+  }
+  if (/bilibili\.com|b23\.tv/i.test(url)) {
+    return 'bilibili'
+  }
+  return 'unknown'
+}
 
 // 视频格式信息
 export interface VideoFormat {
@@ -37,6 +52,7 @@ export interface VideoInfo {
   description: string
   formats: VideoFormat[]
   url: string
+  platform: Platform
   isPlaylist?: boolean
   playlistTitle?: string
   playlistIndex?: number
@@ -163,16 +179,29 @@ class YtdlpService extends EventEmitter {
       await this.initialize()
     }
 
-    // 构建参数，不使用 -f best（避免 yt-dlp-wrap 自动添加导致的问题）
-    // 使用内置 Deno 解决 YouTube n parameter challenge
-    const args: string[] = [url, '--dump-json', '--no-warnings', '--no-check-certificates', '--js-runtimes', `deno:${this.denoPath}`]
+    const platform = detectPlatform(url)
 
-    // 优先使用本地 cookies 文件（App 内登录）
-    if (fs.existsSync(COOKIES_FILE_PATH)) {
-      args.push('--cookies', COOKIES_FILE_PATH)
+    // 构建参数，不使用 -f best（避免 yt-dlp-wrap 自动添加导致的问题）
+    const args: string[] = [url, '--dump-json', '--no-warnings', '--no-check-certificates']
+
+    // YouTube 需要 Deno 解决 n parameter challenge，B站不需要
+    if (platform === 'youtube') {
+      args.push('--js-runtimes', `deno:${this.denoPath}`)
+    }
+
+    // 根据平台选择 cookies 文件
+    if (platform === 'bilibili' && fs.existsSync(BILIBILI_COOKIES_FILE_PATH)) {
+      args.push('--cookies', BILIBILI_COOKIES_FILE_PATH)
+    } else if (platform === 'youtube' && fs.existsSync(YOUTUBE_COOKIES_FILE_PATH)) {
+      args.push('--cookies', YOUTUBE_COOKIES_FILE_PATH)
     } else if (cookiesBrowser && cookiesBrowser !== 'none') {
       // 否则使用浏览器 cookies
       args.push('--cookies-from-browser', cookiesBrowser)
+    }
+
+    // B站需要添加 referer
+    if (platform === 'bilibili') {
+      args.push('--referer', 'https://www.bilibili.com')
     }
 
     // 直接使用 execPromise 避免 yt-dlp-wrap 自动添加 -f best
@@ -186,18 +215,28 @@ class YtdlpService extends EventEmitter {
       duration: metadata.duration || 0,
       durationFormatted: this.formatDuration(metadata.duration || 0),
       channel: metadata.channel || metadata.uploader || '',
-      channelId: metadata.channel_id || '',
+      channelId: metadata.channel_id || metadata.uploader_id || '',
       viewCount: metadata.view_count || 0,
       uploadDate: metadata.upload_date || '',
       description: metadata.description || '',
       formats: this.parseFormats(metadata.formats),
       url: url,
+      platform: platform,
     }
   }
 
   // 检测是否为播放列表
   isPlaylistUrl(url: string): boolean {
-    return url.includes('list=') || url.includes('/playlist')
+    // YouTube 播放列表
+    if (url.includes('list=') || url.includes('/playlist')) {
+      return true
+    }
+    // B站合集/收藏夹
+    if (/bilibili\.com\/medialist\/play/i.test(url)) {
+      return true
+    }
+    // B站视频合集（带 p 参数的多P视频不算播放列表，单独处理）
+    return false
   }
 
   // 获取播放列表信息
@@ -206,16 +245,29 @@ class YtdlpService extends EventEmitter {
       await this.initialize()
     }
 
-    // 构建参数，根据设置决定是否添加 cookies
-    // 使用内置 Deno 解决 YouTube n parameter challenge
-    const args: string[] = [url, '--flat-playlist', '--yes-playlist', '--dump-json', '--no-warnings', '--no-check-certificates', '--js-runtimes', `deno:${this.denoPath}`]
+    const platform = detectPlatform(url)
 
-    // 优先使用本地 cookies 文件（App 内登录）
-    if (fs.existsSync(COOKIES_FILE_PATH)) {
-      args.push('--cookies', COOKIES_FILE_PATH)
+    // 构建参数
+    const args: string[] = [url, '--flat-playlist', '--yes-playlist', '--dump-json', '--no-warnings', '--no-check-certificates']
+
+    // YouTube 需要 Deno 解决 n parameter challenge
+    if (platform === 'youtube') {
+      args.push('--js-runtimes', `deno:${this.denoPath}`)
+    }
+
+    // 根据平台选择 cookies 文件
+    if (platform === 'bilibili' && fs.existsSync(BILIBILI_COOKIES_FILE_PATH)) {
+      args.push('--cookies', BILIBILI_COOKIES_FILE_PATH)
+    } else if (platform === 'youtube' && fs.existsSync(YOUTUBE_COOKIES_FILE_PATH)) {
+      args.push('--cookies', YOUTUBE_COOKIES_FILE_PATH)
     } else if (cookiesBrowser && cookiesBrowser !== 'none') {
       // 否则使用浏览器 cookies
       args.push('--cookies-from-browser', cookiesBrowser)
+    }
+
+    // B站需要添加 referer
+    if (platform === 'bilibili') {
+      args.push('--referer', 'https://www.bilibili.com')
     }
 
     // 直接使用 execPromise 避免 yt-dlp-wrap 自动添加 -f best
@@ -284,6 +336,16 @@ class YtdlpService extends EventEmitter {
       const entry = entries[i]
       if (!entry || !entry.id) continue // 跳过无效条目（如已删除的视频）
 
+      // 根据平台生成视频 URL
+      let videoUrl = entry.url
+      if (!videoUrl) {
+        if (platform === 'bilibili') {
+          videoUrl = `https://www.bilibili.com/video/${entry.id}`
+        } else {
+          videoUrl = `https://www.youtube.com/watch?v=${entry.id}`
+        }
+      }
+
       videos.push({
         id: entry.id,
         title: entry.title || `Video ${i + 1}`,
@@ -291,12 +353,13 @@ class YtdlpService extends EventEmitter {
         duration: entry.duration || 0,
         durationFormatted: this.formatDuration(entry.duration || 0),
         channel: entry.channel || entry.uploader || playlistChannel || '',
-        channelId: entry.channel_id || '',
+        channelId: entry.channel_id || entry.uploader_id || '',
         viewCount: entry.view_count || 0,
         uploadDate: entry.upload_date || '',
         description: '',
         formats: [],
-        url: entry.url || `https://www.youtube.com/watch?v=${entry.id}`,
+        url: videoUrl,
+        platform: platform,
         isPlaylist: true,
         playlistTitle: playlistTitle,
         playlistIndex: i + 1,

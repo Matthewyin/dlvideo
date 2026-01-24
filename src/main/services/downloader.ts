@@ -5,7 +5,22 @@ import { app } from 'electron'
 import { EventEmitter } from 'events'
 
 // Cookies 文件路径
-const COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'youtube_cookies.txt')
+const YOUTUBE_COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'youtube_cookies.txt')
+const BILIBILI_COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'bilibili_cookies.txt')
+
+// 平台类型
+export type Platform = 'youtube' | 'bilibili' | 'unknown'
+
+// 检测 URL 对应的平台
+function detectPlatform(url: string): Platform {
+  if (/youtube\.com|youtu\.be/i.test(url)) {
+    return 'youtube'
+  }
+  if (/bilibili\.com|b23\.tv/i.test(url)) {
+    return 'bilibili'
+  }
+  return 'unknown'
+}
 
 // Cookies 来源浏览器类型
 export type CookiesBrowser = 'none' | 'chrome' | 'safari'
@@ -44,7 +59,6 @@ export interface DownloadResult {
 
 class DownloaderService extends EventEmitter {
   private activeDownloads: Map<string, ChildProcess> = new Map()
-  private pausedDownloads: Map<string, DownloadOptions> = new Map()
   private ytdlpPath: string = ''
   private denoPath: string = ''
   private aria2cPath: string = ''
@@ -184,6 +198,9 @@ class DownloaderService extends EventEmitter {
   async startDownload(taskId: string, options: DownloadOptions): Promise<void> {
     const { url, outputPath, filename, formatId, audioOnly, subtitles, subtitleLang, proxyUrl, convertFormat, cookiesBrowser } = options
 
+    // 检测平台
+    const platform = detectPlatform(url)
+
     // 确保输出目录存在
     if (!fs.existsSync(outputPath)) {
       fs.mkdirSync(outputPath, { recursive: true })
@@ -205,7 +222,6 @@ class DownloaderService extends EventEmitter {
       '-c', // 断点续传：继续下载部分下载的文件
       '--no-part', // 不使用.part临时文件，直接写入目标文件
       '--no-check-certificates', // 跳过证书检查
-      '--js-runtimes', `deno:${this.denoPath}`, // 使用内置 Deno 解决 YouTube n parameter challenge
       '--concurrent-fragments', '8', // 并行下载8个片段，加速下载
       '--retries', '10', // 重试次数
       '--fragment-retries', '10', // 片段重试次数
@@ -218,9 +234,21 @@ class DownloaderService extends EventEmitter {
       '--downloader-args', 'aria2c:-x 16 -s 16 -k 1M --file-allocation=none', // aria2c 参数：16连接、16分段、1M块大小
     ]
 
-    // 优先使用本地 cookies 文件（App 内登录）
-    if (fs.existsSync(COOKIES_FILE_PATH)) {
-      args.push('--cookies', COOKIES_FILE_PATH)
+    // YouTube 需要 Deno 解决 n parameter challenge，B站不需要
+    if (platform === 'youtube') {
+      args.push('--js-runtimes', `deno:${this.denoPath}`)
+    }
+
+    // B站需要添加 referer
+    if (platform === 'bilibili') {
+      args.push('--referer', 'https://www.bilibili.com')
+    }
+
+    // 根据平台选择 cookies 文件
+    if (platform === 'bilibili' && fs.existsSync(BILIBILI_COOKIES_FILE_PATH)) {
+      args.push('--cookies', BILIBILI_COOKIES_FILE_PATH)
+    } else if (platform === 'youtube' && fs.existsSync(YOUTUBE_COOKIES_FILE_PATH)) {
+      args.push('--cookies', YOUTUBE_COOKIES_FILE_PATH)
     } else if (cookiesBrowser && cookiesBrowser !== 'none') {
       // 否则使用浏览器 cookies
       args.push('--cookies-from-browser', cookiesBrowser)

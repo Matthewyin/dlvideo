@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react'
 import { Clock, User, Eye, Calendar, Download, Music, Subtitles, RefreshCw, X } from 'lucide-react'
-import { useDownloadStore, VideoFormat, DownloadTask } from '../stores/downloadStore'
+import { useDownloadStore, DownloadTask } from '../stores/downloadStore'
+
+// YouTube 图标组件
+const YouTubeIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+  </svg>
+)
+
+// B站 图标组件
+const BilibiliIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.813 4.653h.854c1.51.054 2.769.578 3.773 1.574 1.004.995 1.524 2.249 1.56 3.76v7.36c-.036 1.51-.556 2.769-1.56 3.773s-2.262 1.524-3.773 1.56H5.333c-1.51-.036-2.769-.556-3.773-1.56S.036 18.858 0 17.347v-7.36c.036-1.511.556-2.765 1.56-3.76 1.004-.996 2.262-1.52 3.773-1.574h.774l-1.174-1.12a1.234 1.234 0 0 1-.373-.906c0-.356.124-.659.373-.907l.027-.027c.267-.249.573-.373.92-.373.347 0 .653.124.92.373L9.653 4.44c.071.071.134.142.187.213h4.267a.836.836 0 0 1 .16-.213l2.853-2.747c.267-.249.573-.373.92-.373.347 0 .662.151.929.4.267.249.391.551.391.907 0 .355-.124.657-.373.906L17.813 4.653zM5.333 7.24c-.746.018-1.373.276-1.88.773-.506.498-.769 1.13-.786 1.894v7.52c.017.764.28 1.395.786 1.893.507.498 1.134.756 1.88.773h13.334c.746-.017 1.373-.275 1.88-.773.506-.498.769-1.129.786-1.893v-7.52c-.017-.765-.28-1.396-.786-1.894-.507-.497-1.134-.755-1.88-.773H5.333zM8 11.107c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c0-.373.129-.689.386-.947.258-.257.574-.386.947-.386zm8 0c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c.017-.391.15-.711.4-.96.249-.249.56-.373.933-.373z"/>
+  </svg>
+)
 
 // 常用字幕语言
 const SUBTITLE_LANGUAGES = [
@@ -64,14 +78,14 @@ export const VideoPreview: React.FC = () => {
       <div className="bg-dark-700 rounded-xl p-12 border border-dark-500 border-dashed">
         <div className="text-center text-gray-500">
           <Download className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p className="text-lg">粘贴YouTube链接开始下载</p>
-          <p className="text-sm mt-2">支持视频、短视频、播放列表</p>
+          <p className="text-lg">粘贴视频链接开始下载</p>
+          <p className="text-sm mt-2">支持 YouTube、B站 视频、播放列表</p>
         </div>
       </div>
     )
   }
 
-  const { title, thumbnail, durationFormatted, channel, viewCount, uploadDate, formats, url } = currentVideoInfo
+  const { title, thumbnail, durationFormatted, channel, viewCount, uploadDate, formats, url, platform } = currentVideoInfo
 
   // 获取可用分辨率
   const resolutions = [...new Set(formats.filter(f => f.hasVideo).map(f => f.resolution))]
@@ -177,7 +191,16 @@ export const VideoPreview: React.FC = () => {
 
         {/* 视频信息 */}
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-text-primary truncate mb-3">{title}</h3>
+          <div className="flex items-center gap-2 mb-3">
+            {/* 平台图标 */}
+            {platform === 'youtube' && (
+              <YouTubeIcon className="w-5 h-5 text-red-500 flex-shrink-0" />
+            )}
+            {platform === 'bilibili' && (
+              <BilibiliIcon className="w-5 h-5 text-pink-500 flex-shrink-0" />
+            )}
+            <h3 className="text-lg font-semibold text-text-primary truncate">{title}</h3>
+          </div>
           <div className="flex flex-wrap gap-4 text-sm text-text-secondary">
             <span className="flex items-center gap-1.5">
               <User className="w-4 h-4" /> {channel}

@@ -5,14 +5,19 @@ import { useDownloadStore, Settings } from '../stores/downloadStore'
 export const SettingsPage: React.FC = () => {
   const { settings, updateSettings, saveSettings, setCurrentPage } = useDownloadStore()
   const [youtubeLoggedIn, setYoutubeLoggedIn] = useState(false)
+  const [bilibiliLoggedIn, setBilibiliLoggedIn] = useState(false)
   const [checkingLogin, setCheckingLogin] = useState(true)
 
-  // 检查 YouTube 登录状态
+  // 检查登录状态
   useEffect(() => {
     const checkLogin = async () => {
       try {
-        const result = await window.electronAPI.checkYouTubeLogin()
-        setYoutubeLoggedIn(result.loggedIn)
+        const [youtubeResult, bilibiliResult] = await Promise.all([
+          window.electronAPI.checkYouTubeLogin(),
+          window.electronAPI.checkBilibiliLogin()
+        ])
+        setYoutubeLoggedIn(youtubeResult.loggedIn)
+        setBilibiliLoggedIn(bilibiliResult.loggedIn)
       } catch (error) {
         console.error('检查登录状态失败:', error)
       } finally {
@@ -48,6 +53,37 @@ export const SettingsPage: React.FC = () => {
       setYoutubeLoggedIn(false)
     } catch (error) {
       console.error('登出失败:', error)
+    }
+  }
+
+  // ========== B站 相关处理函数 ==========
+
+  // 打开浏览器登录 B站
+  const handleOpenBilibiliBrowser = async () => {
+    await window.electronAPI.openBilibiliLogin()
+  }
+
+  // 导入 B站 Cookies 文件
+  const handleImportBilibiliCookies = async () => {
+    try {
+      const result = await window.electronAPI.importBilibiliCookiesFile()
+      if (result.success) {
+        setBilibiliLoggedIn(true)
+      } else if (result.message && result.message !== '未选择文件') {
+        alert(result.message)
+      }
+    } catch (error) {
+      console.error('导入 B站 Cookies 失败:', error)
+    }
+  }
+
+  // 处理 B站 登出
+  const handleBilibiliLogout = async () => {
+    try {
+      await window.electronAPI.logoutBilibili()
+      setBilibiliLoggedIn(false)
+    } catch (error) {
+      console.error('B站 登出失败:', error)
     }
   }
 
@@ -204,6 +240,58 @@ export const SettingsPage: React.FC = () => {
               </div>
               <p className="text-xs text-text-tertiary mt-2">
                 步骤：1. 点击「打开浏览器登录」在浏览器中登录 YouTube →
+                2. 使用扩展导出 cookies.txt（推荐 "Get cookies.txt LOCALLY"）→
+                3. 点击「导入 Cookies」选择文件
+              </p>
+            </div>
+
+            {/* 分隔线 */}
+            <div className="border-t border-border"></div>
+
+            {/* B站 登录 */}
+            <div>
+              <label className="block text-sm text-text-secondary mb-2">B站 账号</label>
+              <div className="flex items-center gap-3 flex-wrap">
+                {checkingLogin ? (
+                  <div className="flex items-center gap-2 text-text-tertiary">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm">检查登录状态...</span>
+                  </div>
+                ) : bilibiliLoggedIn ? (
+                  <>
+                    <div className="flex items-center gap-2 text-green-500">
+                      <CheckCircle className="w-4 h-4" />
+                      <span className="text-sm">Cookies 已导入</span>
+                    </div>
+                    <button
+                      onClick={handleBilibiliLogout}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-red-400 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      清除
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleOpenBilibiliBrowser}
+                      className="flex items-center gap-2 px-4 py-2 bg-surface-tertiary hover:bg-surface-hover border border-border rounded-lg text-sm text-text-primary transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      打开浏览器登录
+                    </button>
+                    <button
+                      onClick={handleImportBilibiliCookies}
+                      className="flex items-center gap-2 px-4 py-2 bg-pink-600 hover:bg-pink-700 rounded-lg text-sm text-white transition-colors"
+                    >
+                      <FileUp className="w-4 h-4" />
+                      导入 Cookies
+                    </button>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-text-tertiary mt-2">
+                步骤：1. 点击「打开浏览器登录」在浏览器中登录 B站 →
                 2. 使用扩展导出 cookies.txt（推荐 "Get cookies.txt LOCALLY"）→
                 3. 点击「导入 Cookies」选择文件
               </p>

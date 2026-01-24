@@ -5,10 +5,11 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { ytdlpService } from './services/ytdlp'
 import { downloaderService, DownloadOptions } from './services/downloader'
-import { databaseService, HistoryItem, AppSettings } from './services/database'
+import { databaseService, HistoryItem, AppSettings, CookiesBrowser } from './services/database'
 
 // Cookies 文件路径
-const COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'youtube_cookies.txt')
+const YOUTUBE_COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'youtube_cookies.txt')
+const BILIBILI_COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'bilibili_cookies.txt')
 
 // ESM 兼容 __dirname
 const __filename = fileURLToPath(import.meta.url)
@@ -18,7 +19,7 @@ const __dirname = path.dirname(__filename)
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
 // 默认下载路径
-const DEFAULT_DOWNLOAD_PATH = path.join(os.homedir(), 'Downloads', 'DLYouTube')
+const DEFAULT_DOWNLOAD_PATH = path.join(os.homedir(), 'Downloads', 'DLVideo')
 
 let mainWindow: BrowserWindow | null = null
 
@@ -28,7 +29,7 @@ function createWindow() {
     height: 700,
     minWidth: 800,
     minHeight: 600,
-    title: 'DLYouTube',
+    title: 'DLVideo',
     backgroundColor: '#0f0f1a',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 15, y: 15 },
@@ -149,7 +150,7 @@ ipcMain.handle('parse-playlist', async (_, url: string) => {
 ipcMain.handle('start-download', async (_, taskId: string, options: DownloadOptions) => {
   try {
     // 获取 cookies 浏览器设置并添加到选项中
-    const cookiesBrowser = databaseService.getSetting('cookiesBrowser') || 'chrome'
+    const cookiesBrowser = (databaseService.getSetting('cookiesBrowser') || 'chrome') as CookiesBrowser
     const optionsWithCookies = { ...options, cookiesBrowser }
 
     // 异步启动下载，不等待完成
@@ -296,8 +297,8 @@ ipcMain.handle('import-cookies-file', async () => {
     }
 
     // 复制到应用数据目录
-    fs.writeFileSync(COOKIES_FILE_PATH, content, 'utf-8')
-    console.log(`Imported cookies from ${sourcePath} to ${COOKIES_FILE_PATH}`)
+    fs.writeFileSync(YOUTUBE_COOKIES_FILE_PATH, content, 'utf-8')
+    console.log(`Imported cookies from ${sourcePath} to ${YOUTUBE_COOKIES_FILE_PATH}`)
 
     return { success: true, message: 'Cookies 导入成功' }
   } catch (error) {
@@ -310,12 +311,12 @@ ipcMain.handle('import-cookies-file', async () => {
 ipcMain.handle('check-youtube-login', async () => {
   try {
     // 检查 cookies 文件是否存在
-    if (!fs.existsSync(COOKIES_FILE_PATH)) {
+    if (!fs.existsSync(YOUTUBE_COOKIES_FILE_PATH)) {
       return { loggedIn: false }
     }
 
     // 检查文件是否有内容
-    const content = fs.readFileSync(COOKIES_FILE_PATH, 'utf-8')
+    const content = fs.readFileSync(YOUTUBE_COOKIES_FILE_PATH, 'utf-8')
     const hasCookies = content.includes('youtube.com') && content.split('\n').length > 5
 
     return { loggedIn: hasCookies }
@@ -329,8 +330,8 @@ ipcMain.handle('check-youtube-login', async () => {
 ipcMain.handle('logout-youtube', async () => {
   try {
     // 删除 cookies 文件
-    if (fs.existsSync(COOKIES_FILE_PATH)) {
-      fs.unlinkSync(COOKIES_FILE_PATH)
+    if (fs.existsSync(YOUTUBE_COOKIES_FILE_PATH)) {
+      fs.unlinkSync(YOUTUBE_COOKIES_FILE_PATH)
     }
     return { success: true }
   } catch (error) {
@@ -339,7 +340,83 @@ ipcMain.handle('logout-youtube', async () => {
   }
 })
 
-// IPC 处理器 - 获取 cookies 文件路径
+// IPC 处理器 - 获取 YouTube cookies 文件路径
 ipcMain.handle('get-cookies-file-path', () => {
-  return COOKIES_FILE_PATH
+  return YOUTUBE_COOKIES_FILE_PATH
+})
+
+// ========== B站 Cookies 相关 IPC 处理器 ==========
+
+// IPC 处理器 - 打开系统浏览器登录 B站
+ipcMain.handle('open-bilibili-login', async () => {
+  shell.openExternal('https://www.bilibili.com/')
+  return { success: true, message: '已打开浏览器，请登录后导出 Cookies 文件' }
+})
+
+// IPC 处理器 - 导入 B站 Cookies 文件
+ipcMain.handle('import-bilibili-cookies-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: '选择 B站 Cookies 文件',
+    filters: [
+      { name: 'Cookies 文件', extensions: ['txt'] },
+      { name: '所有文件', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  })
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { success: false, message: '未选择文件' }
+  }
+
+  try {
+    const sourcePath = result.filePaths[0]
+    const content = fs.readFileSync(sourcePath, 'utf-8')
+
+    // 验证是否是有效的 B站 cookies 文件
+    if (!content.includes('.bilibili.com')) {
+      return { success: false, message: 'Cookies 文件中未找到 B站 相关的 cookies' }
+    }
+
+    // 复制到应用数据目录
+    fs.writeFileSync(BILIBILI_COOKIES_FILE_PATH, content, 'utf-8')
+    console.log(`Imported Bilibili cookies from ${sourcePath} to ${BILIBILI_COOKIES_FILE_PATH}`)
+
+    return { success: true, message: 'B站 Cookies 导入成功' }
+  } catch (error) {
+    console.error('导入 B站 Cookies 失败:', error)
+    return { success: false, message: (error as Error).message }
+  }
+})
+
+// IPC 处理器 - 检查 B站 登录状态
+ipcMain.handle('check-bilibili-login', async () => {
+  try {
+    // 检查 cookies 文件是否存在
+    if (!fs.existsSync(BILIBILI_COOKIES_FILE_PATH)) {
+      return { loggedIn: false }
+    }
+
+    // 检查文件是否有内容
+    const content = fs.readFileSync(BILIBILI_COOKIES_FILE_PATH, 'utf-8')
+    const hasCookies = content.includes('bilibili.com') && content.split('\n').length > 5
+
+    return { loggedIn: hasCookies }
+  } catch (error) {
+    console.error('检查 B站 登录状态失败:', error)
+    return { loggedIn: false }
+  }
+})
+
+// IPC 处理器 - 登出 B站（删除 cookies 文件）
+ipcMain.handle('logout-bilibili', async () => {
+  try {
+    // 删除 cookies 文件
+    if (fs.existsSync(BILIBILI_COOKIES_FILE_PATH)) {
+      fs.unlinkSync(BILIBILI_COOKIES_FILE_PATH)
+    }
+    return { success: true }
+  } catch (error) {
+    console.error('B站 登出失败:', error)
+    return { success: false, message: (error as Error).message }
+  }
 })

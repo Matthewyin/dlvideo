@@ -14,6 +14,9 @@ export interface VideoFormat {
   tbr?: number | null
 }
 
+// 平台类型
+export type Platform = 'youtube' | 'bilibili' | 'unknown'
+
 // 视频信息类型
 export interface VideoInfo {
   id: string
@@ -28,6 +31,7 @@ export interface VideoInfo {
   description?: string
   formats: VideoFormat[]
   url: string
+  platform?: Platform // 视频来源平台
 }
 
 // 下载任务类型
@@ -55,10 +59,11 @@ export interface Settings {
   maxConcurrentDownloads: number
   autoDetectClipboard: boolean
   showNotifications: boolean
-  theme: 'light' | 'dark' | 'system'
   proxyEnabled: boolean
   proxyUrl: string
   cookiesBrowser: CookiesBrowser // Cookies 来源浏览器
+  // B站相关设置
+  bilibiliCookiesImported: boolean
 }
 
 // 历史记录类型（来自数据库）
@@ -155,10 +160,10 @@ const defaultSettings: Settings = {
   maxConcurrentDownloads: 3,
   autoDetectClipboard: true,
   showNotifications: true,
-  theme: 'dark',
   proxyEnabled: false,
   proxyUrl: '',
   cookiesBrowser: 'chrome', // 默认使用 Chrome 的 cookies
+  bilibiliCookiesImported: false, // B站 cookies 是否已导入
 }
 
 // 初始化应用（加载设置和默认下载路径）

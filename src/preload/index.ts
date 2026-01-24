@@ -42,10 +42,11 @@ interface AppSettings {
   maxConcurrentDownloads: number
   autoDetectClipboard: boolean
   showNotifications: boolean
-  theme: 'light' | 'dark' | 'system'
   proxyEnabled: boolean
   proxyUrl: string
   cookiesBrowser: CookiesBrowser
+  // B站相关设置
+  bilibiliCookiesImported: boolean
 }
 
 // 下载进度接口
@@ -151,6 +152,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 获取 cookies 文件路径
   getCookiesFilePath: () => ipcRenderer.invoke('get-cookies-file-path'),
 
+  // ============ B站 登录相关 API ============
+
+  // 打开系统浏览器登录 B站
+  openBilibiliLogin: () => ipcRenderer.invoke('open-bilibili-login'),
+
+  // 导入 B站 Cookies 文件
+  importBilibiliCookiesFile: () => ipcRenderer.invoke('import-bilibili-cookies-file'),
+
+  // 检查 B站 登录状态
+  checkBilibiliLogin: () => ipcRenderer.invoke('check-bilibili-login'),
+
+  // 登出 B站
+  logoutBilibili: () => ipcRenderer.invoke('logout-bilibili'),
+
   // 平台信息
   platform: process.platform,
 })
@@ -184,6 +199,11 @@ declare global {
       checkYouTubeLogin: () => Promise<{ loggedIn: boolean }>
       logoutYouTube: () => Promise<{ success: boolean; message?: string }>
       getCookiesFilePath: () => Promise<string>
+      // B站 登录相关
+      openBilibiliLogin: () => Promise<{ success: boolean; message?: string }>
+      importBilibiliCookiesFile: () => Promise<{ success: boolean; message?: string }>
+      checkBilibiliLogin: () => Promise<{ loggedIn: boolean }>
+      logoutBilibili: () => Promise<{ success: boolean; message?: string }>
       platform: NodeJS.Platform
     }
   }

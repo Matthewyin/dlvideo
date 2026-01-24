@@ -1,9 +1,10 @@
-# DLYouTube
+# DLVideo
 
-一款简洁易用的 YouTube 视频下载工具，基于 Electron 构建的桌面应用。
+一款简洁易用的视频下载工具，支持 YouTube、B站等平台，基于 Electron 构建的桌面应用。
 
 ## ✨ 功能特性
 
+- 🌐 **多平台支持** - 支持 YouTube、B站（Bilibili）等主流视频平台
 - 🎬 **高速下载** - 内置 aria2c 多线程下载，速度提升 3-5 倍
 - 🎵 **视频音频合并** - 自动合并视频和音频为单个 MP4 文件
 - 📝 **字幕嵌入** - 默认下载并嵌入字幕（英文/中文），支持多语言
@@ -22,7 +23,7 @@
 - **Vite** - 快速构建工具
 - **Tailwind CSS** - 样式框架
 - **Zustand** - 状态管理
-- **yt-dlp** - YouTube 下载核心（已内置）
+- **yt-dlp** - 视频下载核心（已内置，支持 1000+ 网站）
 - **ffmpeg** - 视频音频处理（已内置）
 - **aria2c** - 高速多线程下载（已内置）
 - **Deno** - JavaScript 运行时（已内置，用于解决 YouTube JS challenge）
@@ -32,7 +33,7 @@
 
 ### 从 Release 下载
 
-前往 [Releases](https://github.com/Matthewyin/dlyoutube/releases) 页面下载最新版本的安装包。
+前往 [Releases](https://github.com/Matthewyin/dlvideo/releases) 页面下载最新版本的安装包。
 
 **系统要求：**
 - macOS 10.13 或更高版本（ARM64/Intel）
@@ -42,8 +43,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/Matthewyin/dlyoutube.git
-cd dlyoutube
+git clone https://github.com/Matthewyin/dlvideo.git
+cd dlvideo
 
 # 安装依赖
 npm install
@@ -57,17 +58,24 @@ npm run electron:build
 
 ## 🚀 使用方法
 
-1. **粘贴链接** - 在输入框中粘贴 YouTube 视频或播放列表链接
+1. **粘贴链接** - 在输入框中粘贴视频链接（支持 YouTube、B站）
 2. **选择配置** - 选择视频格式、分辨率等下载选项
 3. **开始下载** - 点击下载按钮开始下载
 4. **查看进度** - 在下载队列中查看下载进度
 
 ### 支持的链接格式
 
+**YouTube:**
 - 单个视频：`https://www.youtube.com/watch?v=xxxxx`
 - 短链接：`https://youtu.be/xxxxx`
 - 播放列表：`https://www.youtube.com/playlist?list=xxxxx`
 - Shorts：`https://www.youtube.com/shorts/xxxxx`
+
+**B站 (Bilibili):**
+- 普通视频：`https://www.bilibili.com/video/BVxxxxx`
+- AV号视频：`https://www.bilibili.com/video/avxxxxx`
+- 短链接：`https://b23.tv/xxxxx`
+- 番剧：`https://www.bilibili.com/bangumi/play/ssxxxxx`
 
 ## ⚙️ 配置
 

@@ -23,6 +23,23 @@ export const UrlInput: React.FC = () => {
     return patterns.some(pattern => pattern.test(url))
   }
 
+  // 验证B站 URL
+  const isValidBilibiliUrl = (url: string): boolean => {
+    const patterns = [
+      /^(https?:\/\/)?(www\.)?bilibili\.com\/video\/BV[\w]+/i,        // BV号视频
+      /^(https?:\/\/)?(www\.)?bilibili\.com\/video\/av\d+/i,          // AV号视频
+      /^(https?:\/\/)?b23\.tv\/[\w]+/i,                               // 短链接
+      /^(https?:\/\/)?(www\.)?bilibili\.com\/bangumi\/play\/(ss|ep)\d+/i, // 番剧
+      /^(https?:\/\/)?(www\.)?bilibili\.com\/medialist\/play\/\d+/i,  // 收藏夹/合集
+    ]
+    return patterns.some(pattern => pattern.test(url))
+  }
+
+  // 验证视频URL（支持多平台）
+  const isValidVideoUrl = (url: string): boolean => {
+    return isValidYouTubeUrl(url) || isValidBilibiliUrl(url)
+  }
+
   // 解析URL（支持多URL）
   const handleParse = async () => {
     const trimmedInput = inputValue.trim()
@@ -45,8 +62,8 @@ export const UrlInput: React.FC = () => {
 
   // 单个URL解析
   const handleSingleUrlParse = async (url: string) => {
-    if (!isValidYouTubeUrl(url)) {
-      setParseError('请输入有效的YouTube链接')
+    if (!isValidVideoUrl(url)) {
+      setParseError('请输入有效的视频链接（支持YouTube、B站）')
       return
     }
 
@@ -90,12 +107,12 @@ export const UrlInput: React.FC = () => {
       .filter(url => url.length > 0)
 
     if (urls.length === 0) {
-      setParseError('请输入有效的YouTube链接')
+      setParseError('请输入有效的视频链接（支持YouTube、B站）')
       return
     }
 
     // 验证所有URL
-    const invalidUrls = urls.filter(url => !isValidYouTubeUrl(url))
+    const invalidUrls = urls.filter(url => !isValidVideoUrl(url))
     if (invalidUrls.length > 0) {
       setParseError(`以下链接无效：${invalidUrls.slice(0, 3).join(', ')}${invalidUrls.length > 3 ? '...' : ''}`)
       return
@@ -176,9 +193,9 @@ export const UrlInput: React.FC = () => {
     const handlePaste = (e: ClipboardEvent) => {
       const text = e.clipboardData?.getData('text')
       if (text) {
-        // 检查是否为有效的YouTube URL
+        // 检查是否为有效的视频URL
         const urls = text.split(/[\n,，]/).map(u => u.trim()).filter(u => u.length > 0)
-        const hasValidUrl = urls.some(url => isValidYouTubeUrl(url))
+        const hasValidUrl = urls.some(url => isValidVideoUrl(url))
 
         if (hasValidUrl) {
           e.preventDefault()
@@ -217,7 +234,7 @@ export const UrlInput: React.FC = () => {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="粘贴YouTube视频链接（支持多个，用换行符或逗号分隔）..."
+            placeholder="粘贴视频链接（支持YouTube、B站，多个用换行符或逗号分隔）..."
             className="w-full pl-12 pr-4 py-4 bg-surface-secondary border border-border rounded-xl text-text-primary placeholder-text-tertiary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-soft transition-all resize-none"
             rows={inputValue.includes('\n') ? Math.min(inputValue.split('\n').length + 1, 5) : 1}
             disabled={isParsing}

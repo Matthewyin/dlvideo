@@ -144,6 +144,12 @@ interface DownloadState {
   // 当前页面
   currentPage: 'home' | 'settings' | 'history'
   setCurrentPage: (page: 'home' | 'settings' | 'history') => void
+
+  // yt-dlp 更新通知
+  ytdlpUpdateAvailable: boolean
+  setYtdlpUpdateAvailable: (available: boolean) => void
+  ytdlpLatestVersion: string | null
+  setYtdlpLatestVersion: (version: string | null) => void
 }
 
 // 获取默认下载路径（从主进程获取，这里先用占位符）
@@ -324,5 +330,11 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 
   currentPage: 'home',
   setCurrentPage: (page) => set({ currentPage: page }),
+
+  // yt-dlp 更新通知
+  ytdlpUpdateAvailable: false,
+  setYtdlpUpdateAvailable: (available) => set({ ytdlpUpdateAvailable: available }),
+  ytdlpLatestVersion: null,
+  setYtdlpLatestVersion: (version) => set({ ytdlpLatestVersion: version }),
 }))
 

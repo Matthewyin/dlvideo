@@ -1,7 +1,7 @@
 {
   "name": "dlvideo",
-  "version": "1.0.0",
-  "description": "视频下载工具 - 支持YouTube、B站等平台",
+  "version": "1.1.1",
+  "description": "视频下载工具 - 支持 YouTube、B站等平台",
   "type": "module",
   "main": "dist/main/index.js",
   "scripts": {

@@ -1,13 +1,14 @@
 import React, { useEffect } from 'react'
 import { Header } from './components/Header'
 import { Footer } from './components/Footer'
+import { UpdateBanner } from './components/UpdateBanner'
 import { HomePage } from './pages/HomePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { useDownloadStore, initializeApp } from './stores/downloadStore'
 
 const App: React.FC = () => {
-  const { currentPage, setCurrentPage, updateTask, addToHistory, clearCompleted } = useDownloadStore()
+  const { currentPage, setCurrentPage, updateTask, addToHistory, clearCompleted, ytdlpUpdateAvailable, ytdlpLatestVersion, setYtdlpUpdateAvailable, setYtdlpLatestVersion } = useDownloadStore()
 
   // 全局快捷键支持
   useEffect(() => {
@@ -104,12 +105,21 @@ const App: React.FC = () => {
       }
     })
 
+    // 监听 yt-dlp 更新通知
+    const unsubUpdate = window.electronAPI.onYtDlpUpdateAvailable((hasUpdate, version) => {
+      if (hasUpdate) {
+        setYtdlpUpdateAvailable(true)
+        setYtdlpLatestVersion(version)
+      }
+    })
+
     // 清理监听器
     return () => {
       unsubProgress()
       unsubComplete()
+      unsubUpdate()
     }
-  }, [updateTask, addToHistory])
+  }, [updateTask, addToHistory, setYtdlpUpdateAvailable, setYtdlpLatestVersion])
 
   const renderPage = () => {
     switch (currentPage) {
@@ -124,6 +134,11 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-surface text-text-primary">
+      {/* yt-dlp 更新通知 */}
+      {ytdlpUpdateAvailable && ytdlpLatestVersion && (
+        <UpdateBanner version={ytdlpLatestVersion} />
+      )}
+
       <Header />
 
       <main className="flex-1 overflow-y-auto">

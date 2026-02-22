@@ -26,9 +26,9 @@ export const HomePage: React.FC = () => {
           <PlaylistPreview />
         ) : currentVideoInfo ? (
           <VideoPreview />
-        ) : !isParsing && (
+          ) : !isParsing && (
           <div className="bg-surface-secondary rounded-xl p-12 border border-border text-center shadow-soft">
-            <p className="text-text-secondary">粘贴YouTube链接开始下载视频</p>
+            <p className="text-text-secondary">粘贴视频链接开始下载</p>
             <p className="text-text-tertiary text-sm mt-2">支持单视频和播放列表</p>
           </div>
         )}

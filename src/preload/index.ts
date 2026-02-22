@@ -108,6 +108,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('download-complete', handler)
   },
 
+  // 监听 yt-dlp 更新通知
+  onYtDlpUpdateAvailable: (callback: (hasUpdate: boolean, version: string) => void) => {
+    const handler = (_event: IpcRendererEvent, data: { hasUpdate: boolean; version: string }) =>
+      callback(data.hasUpdate, data.version)
+    ipcRenderer.on('ytdlp-update-available', handler)
+    return () => ipcRenderer.removeListener('ytdlp-update-available', handler)
+  },
+
   // ============ 数据库相关 API ============
 
   // 获取所有设置
@@ -135,10 +143,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 获取历史记录数量
   getHistoryCount: () => ipcRenderer.invoke('get-history-count'),
 
-  // ============ YouTube 登录相关 API ============
+  // ============ 登录相关 API ============
 
-  // 打开系统浏览器登录 YouTube
-  openYouTubeLogin: () => ipcRenderer.invoke('open-youtube-login'),
+  // 打开系统浏览器登录
+  openBrowserLogin: () => ipcRenderer.invoke('open-youtube-login'),
 
   // 导入 Cookies 文件
   importCookiesFile: () => ipcRenderer.invoke('import-cookies-file'),
@@ -168,6 +176,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 平台信息
   platform: process.platform,
+
+  // ============ yt-dlp 更新相关 API ============
+
+  // 获取 yt-dlp 版本
+  getYtDlpVersion: () => ipcRenderer.invoke('get-ytdlp-version'),
+
+  // 更新 yt-dlp
+  updateYtDlp: () => ipcRenderer.invoke('update-ytdlp'),
 })
 
 // TypeScript 类型声明
@@ -184,6 +200,7 @@ declare global {
       cancelDownload: (taskId: string) => Promise<boolean>
       onDownloadProgress: (callback: (progress: DownloadProgress) => void) => () => void
       onDownloadComplete: (callback: (result: DownloadResult) => void) => () => void
+      onYtDlpUpdateAvailable: (callback: (hasUpdate: boolean, version: string) => void) => () => void
       // 数据库相关
       getSettings: () => Promise<Partial<AppSettings>>
       saveSettings: (settings: AppSettings) => Promise<{ success: boolean; error?: string }>
@@ -205,6 +222,9 @@ declare global {
       checkBilibiliLogin: () => Promise<{ loggedIn: boolean }>
       logoutBilibili: () => Promise<{ success: boolean; message?: string }>
       platform: NodeJS.Platform
+      // yt-dlp 更新相关
+      getYtDlpVersion: () => Promise<{ success: boolean; version?: string; error?: string }>
+      updateYtDlp: () => Promise<{ success: boolean; message: string; currentVersion?: string; latestVersion?: string }>
     }
   }
 }

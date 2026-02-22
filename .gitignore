@@ -45,6 +45,9 @@ temp/
 
 # AI Agent skills (not part of the project)
 .agent/
+.agents/
+.claude/
+AGENTS.md
 
 # Python cache
 __pycache__/
@@ -53,3 +56,8 @@ __pycache__/
 # Documentation (local only)
 *.docx
 
+# Local runtime data / secrets
+cookie/
+
+# Local experimental assets
+marketing-video/

@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect } from 'react'
-import { FolderOpen, Download, Globe, Bell, ArrowLeft, LogIn, LogOut, CheckCircle, Loader2, FileUp, ExternalLink } from 'lucide-react'
+import { FolderOpen, Download, Globe, Bell, ArrowLeft, LogOut, CheckCircle, Loader2, FileUp, ExternalLink, RefreshCw, Info } from 'lucide-react'
 import { useDownloadStore, Settings } from '../stores/downloadStore'
 
 export const SettingsPage: React.FC = () => {
@@ -7,17 +7,24 @@ export const SettingsPage: React.FC = () => {
   const [youtubeLoggedIn, setYoutubeLoggedIn] = useState(false)
   const [bilibiliLoggedIn, setBilibiliLoggedIn] = useState(false)
   const [checkingLogin, setCheckingLogin] = useState(true)
+  const [ytdlpVersion, setYtdlpVersion] = useState<string | null>(null)
+  const [ytdlpUpdateMessage, setYtdlpUpdateMessage] = useState<string>('')
+  const [ytdlpUpdating, setYtdlpUpdating] = useState(false)
 
-  // 检查登录状态
+  // 检查登录状态和 yt-dlp 版本
   useEffect(() => {
     const checkLogin = async () => {
       try {
-        const [youtubeResult, bilibiliResult] = await Promise.all([
+        const [youtubeResult, bilibiliResult, versionResult] = await Promise.all([
           window.electronAPI.checkYouTubeLogin(),
-          window.electronAPI.checkBilibiliLogin()
+          window.electronAPI.checkBilibiliLogin(),
+          window.electronAPI.getYtDlpVersion()
         ])
         setYoutubeLoggedIn(youtubeResult.loggedIn)
         setBilibiliLoggedIn(bilibiliResult.loggedIn)
+        if (versionResult.success && versionResult.version) {
+          setYtdlpVersion(versionResult.version)
+        }
       } catch (error) {
         console.error('检查登录状态失败:', error)
       } finally {
@@ -27,7 +34,7 @@ export const SettingsPage: React.FC = () => {
     checkLogin()
   }, [])
 
-  // 打开浏览器登录 YouTube
+  // 打开浏览器登录
   const handleOpenBrowser = async () => {
     await window.electronAPI.openYouTubeLogin()
   }
@@ -46,7 +53,7 @@ export const SettingsPage: React.FC = () => {
     }
   }
 
-  // 处理 YouTube 登出
+  // 处理登出
   const handleYouTubeLogout = async () => {
     try {
       await window.electronAPI.logoutYouTube()
@@ -87,6 +94,29 @@ export const SettingsPage: React.FC = () => {
     }
   }
 
+  // ========== yt-dlp 更新相关函数 ==========
+
+  // 处理 yt-dlp 更新
+  const handleUpdateYtDlp = async () => {
+    setYtdlpUpdating(true)
+    setYtdlpUpdateMessage('正在检查更新...')
+    try {
+      const result = await window.electronAPI.updateYtDlp()
+      if (result.success) {
+        setYtdlpUpdateMessage(result.message)
+        if (result.currentVersion) {
+          setYtdlpVersion(result.currentVersion)
+        }
+      } else {
+        setYtdlpUpdateMessage(`更新失败: ${result.message}`)
+      }
+    } catch (error) {
+      setYtdlpUpdateMessage(`更新失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setYtdlpUpdating(false)
+    }
+  }
+
   // 更新设置并保存到数据库
   const handleUpdateSettings = useCallback((newSettings: Partial<Settings>) => {
     updateSettings(newSettings)
@@ -109,6 +139,50 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       <div className="space-y-8">
+        {/* yt-dlp 更新 */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <RefreshCw className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-text-primary">yt-dlp 更新</h2>
+          </div>
+          <div className="bg-surface-secondary rounded-xl p-5 space-y-4 border border-border shadow-soft">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex-1">
+                  <label className="block text-sm text-text-secondary mb-1">当前版本</label>
+                  <span className="text-text-primary font-medium">{ytdlpVersion || '未知'}</span>
+                </div>
+                <button
+                  onClick={handleUpdateYtDlp}
+                  disabled={ytdlpUpdating}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 disabled:bg-primary/50 disabled:cursor-not-allowed rounded-lg text-sm text-white transition-colors"
+                >
+                  {ytdlpUpdating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>更新中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      <span>检查更新</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              {ytdlpUpdateMessage && (
+                <div className={`flex items-start gap-2 text-xs ${ytdlpUpdateMessage.includes('失败') ? 'text-red-400' : 'text-green-400'}`}>
+                  <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                  <span>{ytdlpUpdateMessage}</span>
+                </div>
+              )}
+              <p className="text-xs text-text-tertiary mt-2">
+                定期更新 yt-dlp 可以确保支持最新的 YouTube 变更，避免下载失败（如 403 错误）。
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* 存储设置 */}
         <section>
           <div className="flex items-center gap-2 mb-4">

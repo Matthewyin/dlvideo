@@ -23,6 +23,58 @@ const DEFAULT_DOWNLOAD_PATH = path.join(os.homedir(), 'Downloads', 'DLVideo')
 
 let mainWindow: BrowserWindow | null = null
 
+function parseMaxConcurrentDownloads(value: unknown): number {
+  if (value == null || value === '') {
+    return 3
+  }
+
+  const parsed =
+    typeof value === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(value)
+          } catch {
+            return value
+          }
+        })()
+      : value
+
+  const num = typeof parsed === 'number' ? parsed : Number(parsed)
+  if (!Number.isFinite(num) || num <= 0) return 3
+  return Math.max(1, Math.floor(num))
+}
+
+function syncDownloaderConcurrencyFromSettings(): number {
+  const rawValue = databaseService.getSetting('maxConcurrentDownloads')
+  const limit = parseMaxConcurrentDownloads(rawValue)
+  downloaderService.setMaxConcurrentDownloads(limit)
+  return limit
+}
+
+// 静默检查 yt-dlp 更新（应用启动时）
+async function checkYtDlpUpdates() {
+  try {
+    const result = await downloaderService.updateYtDlp()
+    if (result.success) {
+      // 检查是否有新版本（排除"已更新"的情况）
+      const hasUpdate =
+        (result.message.includes('更新') && !result.message.includes('已更新')) ||
+        result.message.includes('Updating')
+
+      if (hasUpdate && result.latestVersion) {
+        // 发送更新通知到渲染进程
+        mainWindow?.webContents.send('ytdlp-update-available', {
+          hasUpdate: true,
+          version: result.latestVersion
+        })
+      }
+    }
+  } catch (error) {
+    // 静默失败，不影响应用启动
+    console.error('检查 yt-dlp 更新失败:', error)
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1000,
@@ -60,9 +112,14 @@ function createWindow() {
 }
 
 // 应用准备好后创建窗口
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // 初始化数据库
   databaseService.initialize()
+  // 初始化下载并发限制
+  syncDownloaderConcurrencyFromSettings()
+
+  // 检查 yt-dlp 更新（静默检查，不阻塞启动）
+  checkYtDlpUpdates()
 
   createWindow()
 
@@ -149,6 +206,9 @@ ipcMain.handle('parse-playlist', async (_, url: string) => {
 // IPC 处理器 - 开始下载
 ipcMain.handle('start-download', async (_, taskId: string, options: DownloadOptions) => {
   try {
+    // 兜底同步一次并发限制，确保设置变更后无需重启即可生效
+    syncDownloaderConcurrencyFromSettings()
+
     // 获取 cookies 浏览器设置并添加到选项中
     const cookiesBrowser = (databaseService.getSetting('cookiesBrowser') || 'chrome') as CookiesBrowser
     const optionsWithCookies = { ...options, cookiesBrowser }
@@ -197,6 +257,7 @@ ipcMain.handle('get-settings', () => {
 ipcMain.handle('save-settings', (_, settings: AppSettings) => {
   try {
     databaseService.saveAllSettings(settings)
+    downloaderService.setMaxConcurrentDownloads(parseMaxConcurrentDownloads(settings.maxConcurrentDownloads))
     return { success: true }
   } catch (error) {
     return { success: false, error: (error as Error).message }
@@ -417,6 +478,30 @@ ipcMain.handle('logout-bilibili', async () => {
     return { success: true }
   } catch (error) {
     console.error('B站 登出失败:', error)
+    return { success: false, message: (error as Error).message }
+  }
+})
+
+// ============ yt-dlp 更新相关 IPC 处理器 ============
+
+// IPC 处理器 - 获取 yt-dlp 版本
+ipcMain.handle('get-ytdlp-version', async () => {
+  try {
+    const result = await downloaderService.getYtDlpVersion()
+    return result
+  } catch (error) {
+    console.error('获取 yt-dlp 版本失败:', error)
+    return { success: false, error: (error as Error).message }
+  }
+})
+
+// IPC 处理器 - 更新 yt-dlp
+ipcMain.handle('update-ytdlp', async () => {
+  try {
+    const result = await downloaderService.updateYtDlp()
+    return result
+  } catch (error) {
+    console.error('更新 yt-dlp 失败:', error)
     return { success: false, message: (error as Error).message }
   }
 })

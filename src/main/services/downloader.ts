@@ -57,8 +57,18 @@ export interface DownloadResult {
   error?: string
 }
 
+interface PendingDownloadTask {
+  taskId: string
+  options: DownloadOptions
+  resolve: () => void
+  reject: (error: Error) => void
+}
+
 class DownloaderService extends EventEmitter {
   private activeDownloads: Map<string, ChildProcess> = new Map()
+  private pendingQueue: PendingDownloadTask[] = []
+  private queuedTaskIds: Set<string> = new Set()
+  private maxConcurrentDownloads = 3
   private ytdlpPath: string = ''
   private denoPath: string = ''
   private aria2cPath: string = ''
@@ -96,8 +106,28 @@ class DownloaderService extends EventEmitter {
     console.log(`Downloader using ffmpeg at: ${this.ffmpegPath}`)
   }
 
+  // 设置最大并发下载数（仅影响后续调度）
+  setMaxConcurrentDownloads(limit: number): void {
+    const normalizedLimit = Math.max(1, Math.floor(limit || 0))
+    this.maxConcurrentDownloads = normalizedLimit
+    this.drainQueue()
+  }
+
   // 取消下载
   cancelDownload(taskId: string): boolean {
+    // 先取消排队中的任务，避免稍后被偷偷启动
+    if (this.queuedTaskIds.has(taskId)) {
+      const index = this.pendingQueue.findIndex((task) => task.taskId === taskId)
+      if (index >= 0) {
+        const [task] = this.pendingQueue.splice(index, 1)
+        this.queuedTaskIds.delete(taskId)
+        // 用户主动取消排队任务，静默结束该任务 promise
+        task.resolve()
+        return true
+      }
+      this.queuedTaskIds.delete(taskId)
+    }
+
     const process = this.activeDownloads.get(taskId)
     if (process) {
       // 先尝试优雅终止
@@ -114,6 +144,112 @@ class DownloaderService extends EventEmitter {
       return true
     }
     return false
+  }
+
+  // 更新 yt-dlp
+  async updateYtDlp(): Promise<{ success: boolean; message: string; currentVersion?: string; latestVersion?: string }> {
+    return new Promise((resolve) => {
+      const process = spawn(this.ytdlpPath, ['-U'])
+
+      let output = ''
+      let currentVersion = ''
+      let latestVersion = ''
+
+      // 解析输出
+      process.stdout?.on('data', (data: Buffer) => {
+        const text = data.toString()
+        output += text
+
+        // 提取当前版本
+        const currentMatch = text.match(/Current version: stable@([\d.]+)/)
+        if (currentMatch) {
+          currentVersion = currentMatch[1]
+        }
+
+        // 提取最新版本
+        const latestMatch = text.match(/Latest version: stable@([\d.]+)/)
+        if (latestMatch) {
+          latestVersion = latestMatch[1]
+        }
+
+        // 检查是否已更新
+        if (text.includes('yt-dlp is up to date')) {
+          process.kill('SIGTERM')
+          resolve({
+            success: true,
+            message: 'yt-dlp 已是最新版本',
+            currentVersion,
+            latestVersion: currentVersion
+          })
+        }
+
+        // 检查是否正在更新
+        if (text.includes('Updating to')) {
+          resolve({
+            success: true,
+            message: '正在更新 yt-dlp...',
+            currentVersion,
+            latestVersion
+          })
+        }
+      })
+
+      process.stderr?.on('data', (data: Buffer) => {
+        const text = data.toString()
+        output += text
+        console.error('[yt-dlp update]', text)
+      })
+
+      process.on('close', (code) => {
+        if (code === 0 || output.includes('Updated yt-dlp to')) {
+          // 更新成功
+          resolve({
+            success: true,
+            message: 'yt-dlp 更新成功',
+            currentVersion: latestVersion || currentVersion,
+            latestVersion
+          })
+        } else {
+          resolve({
+            success: false,
+            message: `更新失败 (退出码: ${code})`,
+            currentVersion
+          })
+        }
+      })
+
+      process.on('error', (err) => {
+        resolve({
+          success: false,
+          message: err.message
+        })
+      })
+    })
+  }
+
+  // 获取 yt-dlp 版本
+  async getYtDlpVersion(): Promise<{ success: boolean; version?: string; error?: string }> {
+    return new Promise((resolve) => {
+      const process = spawn(this.ytdlpPath, ['--version'])
+
+      let output = ''
+
+      process.stdout?.on('data', (data: Buffer) => {
+        output += data.toString().trim()
+      })
+
+      process.on('close', (code) => {
+        if (code === 0 && output) {
+          resolve({ success: true, version: output })
+        } else {
+          resolve({ success: false, error: '无法获取版本信息' })
+        }
+      })
+
+      process.on('error', (err) => {
+        resolve({ success: false, error: err.message })
+      })
+    })
   }
 
   // 获取活动下载数
@@ -196,7 +332,39 @@ class DownloaderService extends EventEmitter {
 
   // 开始下载
   async startDownload(taskId: string, options: DownloadOptions): Promise<void> {
-    const { url, outputPath, filename, formatId, audioOnly, subtitles, subtitleLang, proxyUrl, convertFormat, cookiesBrowser } = options
+    if (this.activeDownloads.has(taskId) || this.queuedTaskIds.has(taskId)) {
+      throw new Error(`下载任务已存在: ${taskId}`)
+    }
+
+    return new Promise((resolve, reject) => {
+      this.pendingQueue.push({ taskId, options, resolve, reject })
+      this.queuedTaskIds.add(taskId)
+      this.drainQueue()
+    })
+  }
+
+  private drainQueue(): void {
+    while (
+      this.activeDownloads.size < this.maxConcurrentDownloads &&
+      this.pendingQueue.length > 0
+    ) {
+      const nextTask = this.pendingQueue.shift()
+      if (!nextTask) break
+
+      // 任务可能已被取消，跳过即可
+      if (!this.queuedTaskIds.delete(nextTask.taskId)) {
+        continue
+      }
+
+      this.executeDownload(nextTask.taskId, nextTask.options)
+        .then(nextTask.resolve)
+        .catch(nextTask.reject)
+    }
+  }
+
+  // 执行实际下载（由调度器控制启动时机）
+  private async executeDownload(taskId: string, options: DownloadOptions): Promise<void> {
+    const { url, outputPath, filename, formatId, audioOnly, subtitleLang, proxyUrl, convertFormat, cookiesBrowser } = options
 
     // 检测平台
     const platform = detectPlatform(url)
@@ -222,7 +390,7 @@ class DownloaderService extends EventEmitter {
       '-c', // 断点续传：继续下载部分下载的文件
       '--no-part', // 不使用.part临时文件，直接写入目标文件
       '--no-check-certificates', // 跳过证书检查
-      '--concurrent-fragments', '8', // 并行下载8个片段，加速下载
+      '--concurrent-fragments', '4', // 降低分片并发，减少触发 429 风险
       '--retries', '10', // 重试次数
       '--fragment-retries', '10', // 片段重试次数
       '--no-playlist', // 不处理播放列表，加速单视频下载
@@ -231,7 +399,7 @@ class DownloaderService extends EventEmitter {
       '--ffmpeg-location', this.ffmpegPath,
       // aria2c 高速下载配置
       '--downloader', `aria2c:${this.aria2cPath}`, // 使用内置 aria2c 作为下载器
-      '--downloader-args', 'aria2c:-x 16 -s 16 -k 1M --file-allocation=none', // aria2c 参数：16连接、16分段、1M块大小
+      '--downloader-args', 'aria2c:-x 4 -s 4 -k 1M --file-allocation=none', // aria2c 参数：4连接、4分段，降低限流风险
     ]
 
     // YouTube 需要 Deno 解决 n parameter challenge，B站不需要
@@ -331,6 +499,7 @@ class DownloaderService extends EventEmitter {
     return new Promise((resolve, reject) => {
       process.on('close', (code) => {
         this.activeDownloads.delete(taskId)
+        this.drainQueue()
 
         if (code === 0) {
           this.emit('complete', {
@@ -357,6 +526,7 @@ class DownloaderService extends EventEmitter {
 
       process.on('error', (err) => {
         this.activeDownloads.delete(taskId)
+        this.drainQueue()
         this.emit('complete', {
           taskId,
           success: false,
@@ -369,4 +539,3 @@ class DownloaderService extends EventEmitter {
 }
 
 export const downloaderService = new DownloaderService()
-

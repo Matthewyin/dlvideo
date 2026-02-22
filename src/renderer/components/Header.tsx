@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Settings, History, HelpCircle, Youtube, X } from 'lucide-react'
+import { Settings, History, HelpCircle, PlayCircle, X } from 'lucide-react'
 import { useDownloadStore } from '../stores/downloadStore'
 
 export const Header: React.FC = () => {
@@ -12,11 +12,11 @@ export const Header: React.FC = () => {
         {/* Logo */}
         <div className="flex items-center gap-3 app-no-drag">
           <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-soft">
-            <Youtube className="w-6 h-6 text-text-inverse" />
+            <PlayCircle className="w-6 h-6 text-text-inverse" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-text-primary">DLYouTube</h1>
-            <p className="text-xs text-text-tertiary">YouTube视频下载工具</p>
+            <h1 className="text-xl font-bold text-text-primary">DLVideo</h1>
+            <p className="text-xs text-text-tertiary">视频下载工具</p>
           </div>
         </div>
 
@@ -76,23 +76,23 @@ export const Header: React.FC = () => {
             </div>
             <div className="space-y-4 text-sm text-text-secondary">
               <div>
-                <h3 className="font-medium text-text-primary mb-1">📋 粘贴链接</h3>
-                <p>在输入框粘贴YouTube视频或播放列表链接，支持多个链接（每行一个）</p>
+                <h3 className="font-medium text-text-primary mb-1">粘贴链接</h3>
+                <p>在输入框粘贴视频链接，支持多个链接（每行一个）</p>
               </div>
               <div>
-                <h3 className="font-medium text-text-primary mb-1">🎬 单个视频</h3>
+                <h3 className="font-medium text-text-primary mb-1">单个视频</h3>
                 <p>选择视频格式、分辨率，可选下载字幕或仅音频，点击"开始下载"</p>
               </div>
               <div>
-                <h3 className="font-medium text-text-primary mb-1">📁 播放列表</h3>
+                <h3 className="font-medium text-text-primary mb-1">播放列表</h3>
                 <p>勾选要下载的视频，支持全选/取消，点击"下载选中"批量下载</p>
               </div>
               <div>
-                <h3 className="font-medium text-text-primary mb-1">⚙️ 设置</h3>
-                <p>可修改下载路径、配置代理服务器（科学上网）</p>
+                <h3 className="font-medium text-text-primary mb-1">设置</h3>
+                <p>可修改下载路径、配置代理服务器</p>
               </div>
               <div>
-                <h3 className="font-medium text-text-primary mb-1">📜 历史</h3>
+                <h3 className="font-medium text-text-primary mb-1">历史</h3>
                 <p>查看下载历史记录，支持打开文件所在目录</p>
               </div>
             </div>

@@ -159,7 +159,7 @@ export const VideoPreview: React.FC = () => {
   }
 
   // 格式化文件大小
-  const formatFileSize = (bytes?: number) => {
+  const formatFileSize = (bytes?: number | null) => {
     if (!bytes) return '未知'
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -303,4 +303,3 @@ export const VideoPreview: React.FC = () => {
     </div>
   )
 }
-

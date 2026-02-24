@@ -7,10 +7,9 @@ export const UrlInput: React.FC = () => {
     currentUrl, setCurrentUrl, isParsing, setIsParsing,
     setCurrentVideoInfo, setParseError,
     setCurrentPlaylist, setSelectedPlaylistVideos,
-    addToQueue, updateTask
+    addToQueue
   } = useDownloadStore()
   const [inputValue, setInputValue] = useState(currentUrl)
-  const [isMultiMode, setIsMultiMode] = useState(false) // 多URL模式
 
   // 验证YouTube URL
   const isValidYouTubeUrl = (url: string): boolean => {
@@ -143,22 +142,22 @@ export const UrlInput: React.FC = () => {
           if (!result.isPlaylist) {
             // 单个视频，添加到队列
             const videoInfo = result.data
+            const selectedFormat = videoInfo.formats?.[0]
+            if (!selectedFormat) {
+              failedUrls.push(url)
+              continue
+            }
             const taskId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
             addToQueue({
               id: taskId,
-              title: videoInfo.title,
-              url: url,
+              videoInfo,
+              selectedFormat,
               status: 'pending',
               progress: 0,
               speed: '',
               eta: '',
-              formatId: videoInfo.formats?.[0]?.format_id,
-              audioOnly: false,
-              subtitles: false,
-              subtitleLang: 'en',
-              convertFormat: undefined,
-              createdAt: new Date().toISOString(),
+              createdAt: new Date(),
             })
 
             successCount++
@@ -262,4 +261,3 @@ export const UrlInput: React.FC = () => {
     </div>
   )
 }
-

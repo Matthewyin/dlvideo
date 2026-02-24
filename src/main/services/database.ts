@@ -37,6 +37,12 @@ export interface AppSettings {
   cookiesBrowser: CookiesBrowser
   // B站相关设置
   bilibiliCookiesImported: boolean
+  // ASR 相关设置
+  asrEnabled: boolean
+  asrAutoTranscribe: boolean
+  asrLanguage: string // 'auto' | 'zh' | 'en' ...
+  asrOutputFormats: Array<'txt' | 'srt' | 'vtt'>
+  asrModelPath: string
 }
 
 class DatabaseService {
@@ -224,4 +230,3 @@ class DatabaseService {
 }
 
 export const databaseService = new DatabaseService()
-

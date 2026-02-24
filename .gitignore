@@ -7,8 +7,19 @@ release/
 build/*.icns
 build/*.ico
 
-# yt-dlp binary (users should download themselves or use bundled version)
-resources/bin/
+# Bundled runtime binaries (whitelist tracked binaries in resources/bin)
+resources/bin/*
+!resources/bin/aria2c
+!resources/bin/deno
+!resources/bin/ffmpeg
+!resources/bin/ffprobe
+!resources/bin/yt-dlp
+!resources/bin/whisper-cli
+!resources/bin/whisper-cli.exe
+!resources/bin/whisper-cpp
+!resources/bin/whisper-cpp.exe
+!resources/bin/main
+!resources/bin/main.exe
 
 # IDE
 .idea/

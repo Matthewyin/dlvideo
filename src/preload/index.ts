@@ -47,6 +47,12 @@ interface AppSettings {
   cookiesBrowser: CookiesBrowser
   // B站相关设置
   bilibiliCookiesImported: boolean
+  // ASR 相关设置
+  asrEnabled: boolean
+  asrAutoTranscribe: boolean
+  asrLanguage: string
+  asrOutputFormats: Array<'txt' | 'srt' | 'vtt'>
+  asrModelPath: string
 }
 
 // 下载进度接口
@@ -67,6 +73,65 @@ interface DownloadResult {
   error?: string
 }
 
+// ASR 转写选项
+interface AsrOptions {
+  filePath: string
+  outputDir?: string
+  language?: string
+  formats?: Array<'txt' | 'srt' | 'vtt'>
+  modelPath?: string
+}
+
+// ASR 进度
+interface AsrProgress {
+  taskId: string
+  stage: 'queued' | 'extracting' | 'transcribing'
+  message: string
+}
+
+// ASR 结果
+interface AsrResult {
+  taskId: string
+  success: boolean
+  error?: string
+  outputs?: {
+    txt?: string
+    srt?: string
+    vtt?: string
+  }
+}
+
+interface AsrStatus {
+  available: boolean
+  whisperBinary?: string | null
+  modelPath?: string | null
+  defaultModelPath?: string
+  modelDownloadInProgress?: boolean
+  currentModelDownloadTaskId?: string | null
+  missing?: {
+    whisperBinary: boolean
+    modelPath: boolean
+  }
+  error?: string
+}
+
+interface AsrModelDownloadProgress {
+  taskId: string
+  stage: 'starting' | 'downloading'
+  downloadedBytes: number
+  totalBytes?: number
+  percent?: number
+  message: string
+  targetPath: string
+}
+
+interface AsrModelDownloadResult {
+  taskId: string
+  success: boolean
+  filePath?: string
+  error?: string
+}
+
 // 暴露给渲染进程的 API
 contextBridge.exposeInMainWorld('electronAPI', {
   // 选择下载目录
@@ -74,6 +139,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 获取默认下载路径
   getDefaultDownloadPath: () => ipcRenderer.invoke('get-default-download-path'),
+
+  // 选择 ASR 模型文件
+  selectAsrModelFile: () => ipcRenderer.invoke('select-asr-model-file'),
 
   // 打开文件夹
   openFolder: (path: string) => ipcRenderer.invoke('open-folder', path),
@@ -184,6 +252,40 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 更新 yt-dlp
   updateYtDlp: () => ipcRenderer.invoke('update-ytdlp'),
+
+  // ============ ASR 相关 API ============
+
+  getAsrStatus: () => ipcRenderer.invoke('get-asr-status'),
+
+  startAsr: (taskId: string, options: AsrOptions) => ipcRenderer.invoke('start-asr', taskId, options),
+
+  cancelAsr: (taskId: string) => ipcRenderer.invoke('cancel-asr', taskId),
+
+  downloadAsrModel: (taskId: string) => ipcRenderer.invoke('download-asr-model', taskId),
+
+  onAsrProgress: (callback: (progress: AsrProgress) => void) => {
+    const handler = (_event: IpcRendererEvent, progress: AsrProgress) => callback(progress)
+    ipcRenderer.on('asr-progress', handler)
+    return () => ipcRenderer.removeListener('asr-progress', handler)
+  },
+
+  onAsrComplete: (callback: (result: AsrResult) => void) => {
+    const handler = (_event: IpcRendererEvent, result: AsrResult) => callback(result)
+    ipcRenderer.on('asr-complete', handler)
+    return () => ipcRenderer.removeListener('asr-complete', handler)
+  },
+
+  onAsrModelDownloadProgress: (callback: (progress: AsrModelDownloadProgress) => void) => {
+    const handler = (_event: IpcRendererEvent, progress: AsrModelDownloadProgress) => callback(progress)
+    ipcRenderer.on('asr-model-download-progress', handler)
+    return () => ipcRenderer.removeListener('asr-model-download-progress', handler)
+  },
+
+  onAsrModelDownloadComplete: (callback: (result: AsrModelDownloadResult) => void) => {
+    const handler = (_event: IpcRendererEvent, result: AsrModelDownloadResult) => callback(result)
+    ipcRenderer.on('asr-model-download-complete', handler)
+    return () => ipcRenderer.removeListener('asr-model-download-complete', handler)
+  },
 })
 
 // TypeScript 类型声明
@@ -192,6 +294,7 @@ declare global {
     electronAPI: {
       selectDownloadPath: () => Promise<string | null>
       getDefaultDownloadPath: () => Promise<string>
+      selectAsrModelFile: () => Promise<string | null>
       openFolder: (path: string) => Promise<void>
       showItemInFolder: (path: string) => Promise<void>
       parseVideo: (url: string) => Promise<{ success: boolean; data?: any; isPlaylist?: boolean; error?: string }>
@@ -225,7 +328,15 @@ declare global {
       // yt-dlp 更新相关
       getYtDlpVersion: () => Promise<{ success: boolean; version?: string; error?: string }>
       updateYtDlp: () => Promise<{ success: boolean; message: string; currentVersion?: string; latestVersion?: string }>
+      // ASR 相关
+      getAsrStatus: () => Promise<AsrStatus>
+      startAsr: (taskId: string, options: AsrOptions) => Promise<AsrResult>
+      cancelAsr: (taskId: string) => Promise<boolean>
+      downloadAsrModel: (taskId: string) => Promise<AsrModelDownloadResult>
+      onAsrProgress: (callback: (progress: AsrProgress) => void) => () => void
+      onAsrComplete: (callback: (result: AsrResult) => void) => () => void
+      onAsrModelDownloadProgress: (callback: (progress: AsrModelDownloadProgress) => void) => () => void
+      onAsrModelDownloadComplete: (callback: (result: AsrModelDownloadResult) => void) => () => void
     }
   }
 }
-

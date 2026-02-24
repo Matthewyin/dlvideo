@@ -5,6 +5,7 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { ytdlpService } from './services/ytdlp'
 import { downloaderService, DownloadOptions } from './services/downloader'
+import { asrService, AsrOptions } from './services/asr'
 import { databaseService, HistoryItem, AppSettings, CookiesBrowser } from './services/database'
 
 // Cookies 文件路径
@@ -152,6 +153,19 @@ ipcMain.handle('select-download-path', async () => {
   return result.canceled ? null : result.filePaths[0]
 })
 
+// IPC 处理器 - 选择 ASR 模型文件
+ipcMain.handle('select-asr-model-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openFile'],
+    title: '选择 ASR 模型文件 (ggml-*.bin)',
+    filters: [
+      { name: 'Whisper 模型文件', extensions: ['bin'] },
+      { name: '所有文件', extensions: ['*'] },
+    ],
+  })
+  return result.canceled ? null : result.filePaths[0]
+})
+
 // IPC 处理器 - 打开文件夹
 ipcMain.handle('open-folder', async (_, folderPath: string) => {
   shell.openPath(folderPath)
@@ -241,6 +255,26 @@ downloaderService.on('complete', (result) => {
   mainWindow?.webContents.send('download-complete', result)
 })
 
+// 监听 ASR 进度并转发到渲染进程
+asrService.on('progress', (progress) => {
+  mainWindow?.webContents.send('asr-progress', progress)
+})
+
+// 监听 ASR 完成并转发到渲染进程
+asrService.on('complete', (result) => {
+  mainWindow?.webContents.send('asr-complete', result)
+})
+
+// 监听 ASR 模型下载进度并转发到渲染进程
+asrService.on('model-download-progress', (progress) => {
+  mainWindow?.webContents.send('asr-model-download-progress', progress)
+})
+
+// 监听 ASR 模型下载完成并转发到渲染进程
+asrService.on('model-download-complete', (result) => {
+  mainWindow?.webContents.send('asr-model-download-complete', result)
+})
+
 // ============ 数据库相关 IPC 处理器 ============
 
 // IPC 处理器 - 获取所有设置
@@ -271,6 +305,59 @@ ipcMain.handle('get-history', (_, limit?: number, offset?: number) => {
   } catch (error) {
     console.error('获取历史记录失败:', error)
     return []
+  }
+})
+
+// ============ ASR 相关 IPC 处理器 ============
+
+ipcMain.handle('get-asr-status', () => {
+  try {
+    const rawModelPath = databaseService.getSetting('asrModelPath')
+    let modelPathOverride: string | undefined
+    if (rawModelPath) {
+      try {
+        const parsed = JSON.parse(rawModelPath)
+        modelPathOverride = typeof parsed === 'string' ? parsed : undefined
+      } catch {
+        modelPathOverride = rawModelPath
+      }
+    }
+
+    return asrService.getStatus(modelPathOverride)
+  } catch (error) {
+    return {
+      available: false,
+      error: error instanceof Error ? error.message : 'ASR 状态检查失败',
+    }
+  }
+})
+
+ipcMain.handle('start-asr', async (_, taskId: string, options: AsrOptions) => {
+  try {
+    const result = await asrService.startTranscription(taskId, options)
+    return result
+  } catch (error) {
+    return {
+      taskId,
+      success: false,
+      error: error instanceof Error ? error.message : '转写失败',
+    }
+  }
+})
+
+ipcMain.handle('cancel-asr', (_, taskId: string) => {
+  return asrService.cancelTranscription(taskId)
+})
+
+ipcMain.handle('download-asr-model', async (_, taskId: string) => {
+  try {
+    return await asrService.downloadBaseModel(taskId)
+  } catch (error) {
+    return {
+      taskId,
+      success: false,
+      error: error instanceof Error ? error.message : '模型下载失败',
+    }
   }
 })
 

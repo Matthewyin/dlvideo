@@ -64,6 +64,12 @@ export interface Settings {
   cookiesBrowser: CookiesBrowser // Cookies 来源浏览器
   // B站相关设置
   bilibiliCookiesImported: boolean
+  // ASR 相关设置
+  asrEnabled: boolean
+  asrAutoTranscribe: boolean
+  asrLanguage: string
+  asrOutputFormats: Array<'txt' | 'srt' | 'vtt'>
+  asrModelPath: string
 }
 
 // 历史记录类型（来自数据库）
@@ -170,6 +176,11 @@ const defaultSettings: Settings = {
   proxyUrl: '',
   cookiesBrowser: 'chrome', // 默认使用 Chrome 的 cookies
   bilibiliCookiesImported: false, // B站 cookies 是否已导入
+  asrEnabled: true,
+  asrAutoTranscribe: false,
+  asrLanguage: 'auto',
+  asrOutputFormats: ['txt', 'srt'],
+  asrModelPath: '',
 }
 
 // 初始化应用（加载设置和默认下载路径）
@@ -337,4 +348,3 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
   ytdlpLatestVersion: null,
   setYtdlpLatestVersion: (version) => set({ ytdlpLatestVersion: version }),
 }))
-

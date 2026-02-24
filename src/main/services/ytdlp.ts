@@ -78,7 +78,7 @@ export interface DownloadProgress {
 }
 
 class YtdlpService extends EventEmitter {
-  private ytdlp: YTDlpWrap | null = null
+  private ytdlp: InstanceType<typeof YTDlpWrapModule> | null = null
   private binaryPath: string
   private denoPath: string
 
@@ -120,8 +120,9 @@ class YtdlpService extends EventEmitter {
     for (const ytdlpPath of possiblePaths) {
       try {
         console.log(`Trying yt-dlp at: ${ytdlpPath}`)
-        this.ytdlp = new YTDlpWrap(ytdlpPath)
-        const version = await this.ytdlp.getVersion()
+        const ytdlp = new YTDlpWrap(ytdlpPath) as InstanceType<typeof YTDlpWrapModule>
+        const version = await ytdlp.getVersion()
+        this.ytdlp = ytdlp
         console.log(`yt-dlp initialized successfully at: ${ytdlpPath}, version: ${version}`)
         return
       } catch (error) {
@@ -379,4 +380,3 @@ class YtdlpService extends EventEmitter {
 }
 
 export const ytdlpService = new YtdlpService()
-

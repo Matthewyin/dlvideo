@@ -1,16 +1,154 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Search, FolderOpen, Trash2, Download, Loader2 } from 'lucide-react'
+import { ArrowLeft, Search, FolderOpen, Trash2, Download, Loader2, FileText } from 'lucide-react'
 import { useDownloadStore } from '../stores/downloadStore'
 
+interface AsrUiState {
+  status: 'idle' | 'running' | 'success' | 'failed'
+  message?: string
+  outputs?: {
+    txt?: string
+    srt?: string
+    vtt?: string
+  }
+}
+
+interface AsrAvailability {
+  checked: boolean
+  available: boolean
+  message: string | null
+  missingWhisperBinary?: boolean
+  missingModel?: boolean
+  defaultModelPath?: string
+  modelDownloadInProgress?: boolean
+}
+
 export const HistoryPage: React.FC = () => {
-  const { setCurrentPage, historyList, historyLoading, loadHistory, removeFromHistory, clearAllHistory, searchHistory } = useDownloadStore()
+  const { setCurrentPage, historyList, historyLoading, loadHistory, removeFromHistory, clearAllHistory, searchHistory, settings } = useDownloadStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all')
+  const [asrStates, setAsrStates] = useState<Record<string, AsrUiState>>({})
+  const [asrAvailability, setAsrAvailability] = useState<AsrAvailability>({
+    checked: false,
+    available: false,
+    message: null,
+  })
+  const [asrModelDownloadState, setAsrModelDownloadState] = useState<{
+    inProgress: boolean
+    percent?: number
+    message?: string
+  }>({ inProgress: false })
+
+  const getAsrTaskId = (historyId: string) => `asr-${historyId}`
+  const asrModelDownloadTaskId = 'asr-model-base'
+
+  const updateAsrState = useCallback((taskId: string, updates: Partial<AsrUiState>) => {
+    setAsrStates((prev) => ({
+      ...prev,
+      [taskId]: {
+        ...prev[taskId],
+        status: prev[taskId]?.status || 'idle',
+        ...updates,
+      },
+    }))
+  }, [])
+
+  const refreshAsrStatus = useCallback(async () => {
+    try {
+      const status = await window.electronAPI.getAsrStatus()
+      if (status.available) {
+        setAsrAvailability({
+          checked: true,
+          available: true,
+          message: null,
+          missingWhisperBinary: false,
+          missingModel: false,
+          defaultModelPath: status.defaultModelPath,
+          modelDownloadInProgress: status.modelDownloadInProgress,
+        })
+        return
+      }
+
+      const tips: string[] = []
+      if (status.missing?.whisperBinary) tips.push('缺少 whisper-cli')
+      if (status.missing?.modelPath) tips.push('缺少 ggml-base.bin 模型')
+
+      setAsrAvailability({
+        checked: true,
+        available: false,
+        message: status.error || (tips.length > 0 ? tips.join('，') : 'ASR 不可用'),
+        missingWhisperBinary: status.missing?.whisperBinary,
+        missingModel: status.missing?.modelPath,
+        defaultModelPath: status.defaultModelPath,
+        modelDownloadInProgress: status.modelDownloadInProgress,
+      })
+    } catch (error) {
+      setAsrAvailability({
+        checked: true,
+        available: false,
+        message: error instanceof Error ? error.message : 'ASR 状态检查失败',
+      })
+    }
+  }, [])
 
   // 加载历史记录
   useEffect(() => {
     loadHistory()
   }, [loadHistory])
+
+  useEffect(() => {
+    refreshAsrStatus().catch(() => {
+      // handled in refresh
+    })
+
+    const unsubProgress = window.electronAPI.onAsrProgress((progress) => {
+      updateAsrState(progress.taskId, {
+        status: 'running',
+        message: progress.message,
+      })
+    })
+
+    const unsubComplete = window.electronAPI.onAsrComplete((result) => {
+      if (result.success) {
+        updateAsrState(result.taskId, {
+          status: 'success',
+          message: '转写完成',
+          outputs: result.outputs,
+        })
+      } else {
+        updateAsrState(result.taskId, {
+          status: 'failed',
+          message: result.error || '转写失败',
+        })
+      }
+    })
+
+    const unsubModelProgress = window.electronAPI.onAsrModelDownloadProgress((progress) => {
+      if (progress.taskId !== asrModelDownloadTaskId) return
+      setAsrModelDownloadState({
+        inProgress: true,
+        percent: progress.percent,
+        message: progress.message,
+      })
+    })
+
+    const unsubModelComplete = window.electronAPI.onAsrModelDownloadComplete((result) => {
+      if (result.taskId !== asrModelDownloadTaskId) return
+      setAsrModelDownloadState({
+        inProgress: false,
+        message: result.success ? '模型下载完成' : (result.error || '模型下载失败'),
+      })
+      refreshAsrStatus().catch(() => {
+        // handled in refresh
+      })
+    })
+
+    return () => {
+      unsubProgress()
+      unsubComplete()
+      unsubModelProgress()
+      unsubModelComplete()
+    }
+  }, [asrModelDownloadTaskId, refreshAsrStatus, updateAsrState])
 
   // 搜索防抖
   useEffect(() => {
@@ -48,6 +186,44 @@ export const HistoryPage: React.FC = () => {
 
   const groupedHistory = groupByDate(filteredHistory)
 
+  const handleStartAsr = async (historyId: string, filePath: string) => {
+    const taskId = getAsrTaskId(historyId)
+
+    updateAsrState(taskId, {
+      status: 'running',
+      message: '正在提交转写任务...',
+    })
+
+    const result = await window.electronAPI.startAsr(taskId, {
+      filePath,
+      language: settings.asrLanguage,
+      formats: (settings.asrOutputFormats?.length ? settings.asrOutputFormats : ['txt', 'srt']) as Array<'txt' | 'srt' | 'vtt'>,
+      modelPath: settings.asrModelPath?.trim() || undefined,
+    })
+
+    if (!result.success) {
+      updateAsrState(taskId, {
+        status: 'failed',
+        message: result.error || '转写失败',
+      })
+    }
+  }
+
+  const handleDownloadAsrModel = async () => {
+    setAsrModelDownloadState({
+      inProgress: true,
+      message: '正在提交模型下载任务...',
+    })
+
+    const result = await window.electronAPI.downloadAsrModel(asrModelDownloadTaskId)
+    if (!result.success) {
+      setAsrModelDownloadState({
+        inProgress: false,
+        message: result.error || '模型下载失败',
+      })
+    }
+  }
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4 mb-8">
@@ -59,6 +235,47 @@ export const HistoryPage: React.FC = () => {
         </button>
         <h1 className="text-2xl font-bold text-text-primary">下载历史</h1>
       </div>
+
+      {asrAvailability.checked && !asrAvailability.available && (
+        <div className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm space-y-3">
+          <div>
+            <span className="font-medium">ASR 功能暂不可用：</span>
+            <span>{asrAvailability.message || '环境未就绪'}</span>
+          </div>
+
+          {(asrAvailability.missingWhisperBinary || asrAvailability.missingModel) && (
+            <div className="text-xs text-amber-700 space-y-1">
+              {asrAvailability.missingWhisperBinary && (
+                <p>需要先安装 whisper.cpp CLI（命令名 `whisper-cli`，可通过 Homebrew 安装）。</p>
+              )}
+              {asrAvailability.missingModel && (
+                <p>
+                  缺少 ASR 模型 `ggml-base.bin`
+                  {asrAvailability.defaultModelPath ? `（将下载到：${asrAvailability.defaultModelPath}）` : ''}
+                </p>
+              )}
+            </div>
+          )}
+
+          {asrAvailability.missingModel && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={handleDownloadAsrModel}
+                disabled={asrModelDownloadState.inProgress}
+                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
+              >
+                {asrModelDownloadState.inProgress ? '下载模型中...' : '一键下载 base 模型'}
+              </button>
+              {asrModelDownloadState.message && (
+                <span className="text-xs text-amber-800">
+                  {asrModelDownloadState.message}
+                  {typeof asrModelDownloadState.percent === 'number' ? ` (${asrModelDownloadState.percent}%)` : ''}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 搜索和筛选 */}
       <div className="flex items-center gap-4 mb-6">
@@ -137,6 +354,11 @@ export const HistoryPage: React.FC = () => {
 
                       {/* 信息 */}
                       <div className="flex-1 min-w-0">
+                        {(() => {
+                          const asrTaskId = getAsrTaskId(item.id)
+                          const asrState = asrStates[asrTaskId]
+                          return (
+                            <>
                         <p className="text-sm font-medium text-text-primary truncate">
                           {item.title}
                         </p>
@@ -144,10 +366,53 @@ export const HistoryPage: React.FC = () => {
                           {item.ext.toUpperCase()} · {item.resolution} · {item.channel} ·
                           {new Date(item.downloadedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                         </p>
+                              {asrState && asrState.status !== 'idle' && asrState.message && (
+                                <p className={`text-xs mt-1 ${asrState.status === 'failed' ? 'text-error' : asrState.status === 'success' ? 'text-success' : 'text-info'}`}>
+                                  ASR · {asrState.message}
+                                </p>
+                              )}
+                            </>
+                          )
+                        })()}
                       </div>
 
                       {/* 操作按钮 */}
                       <div className="flex items-center gap-2">
+                        {item.filePath && (
+                          (() => {
+                            const asrTaskId = getAsrTaskId(item.id)
+                            const asrState = asrStates[asrTaskId]
+                            const isRunning = asrState?.status === 'running'
+                            const outputPath = asrState?.outputs?.srt || asrState?.outputs?.txt || asrState?.outputs?.vtt
+
+                            return (
+                              <>
+                                <button
+                                  onClick={() => handleStartAsr(item.id, item.filePath)}
+                                  disabled={isRunning || !asrAvailability.available}
+                                  className="p-2 rounded-lg bg-surface-tertiary hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed text-text-secondary transition-colors"
+                                  title={asrAvailability.available ? '语音转文字（ASR）' : 'ASR 不可用'}
+                                >
+                                  {isRunning ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <FileText className="w-4 h-4" />
+                                  )}
+                                </button>
+
+                                {outputPath && (
+                                  <button
+                                    onClick={() => window.electronAPI.showItemInFolder(outputPath)}
+                                    className="p-2 rounded-lg bg-surface-tertiary hover:bg-surface-hover text-text-secondary transition-colors"
+                                    title="打开转写文件"
+                                  >
+                                    <FileText className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </>
+                            )
+                          })()
+                        )}
                         {item.filePath && (
                           <button
                             onClick={() => window.electronAPI.showItemInFolder(item.filePath)}
@@ -176,4 +441,3 @@ export const HistoryPage: React.FC = () => {
     </div>
   )
 }
-

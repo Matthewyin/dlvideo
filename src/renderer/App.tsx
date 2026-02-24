@@ -8,7 +8,7 @@ import { HistoryPage } from './pages/HistoryPage'
 import { useDownloadStore, initializeApp } from './stores/downloadStore'
 
 const App: React.FC = () => {
-  const { currentPage, setCurrentPage, updateTask, addToHistory, clearCompleted, ytdlpUpdateAvailable, ytdlpLatestVersion, setYtdlpUpdateAvailable, setYtdlpLatestVersion } = useDownloadStore()
+  const { currentPage, setCurrentPage, updateTask, addToHistory, clearCompleted, settings, ytdlpUpdateAvailable, ytdlpLatestVersion, setYtdlpUpdateAvailable, setYtdlpLatestVersion } = useDownloadStore()
 
   // 全局快捷键支持
   useEffect(() => {
@@ -97,6 +97,25 @@ const App: React.FC = () => {
             url: task.videoInfo.url,
           })
         }
+
+        // 可选：下载完成后自动转写（ASR）
+        if (result.filePath && settings.asrEnabled && settings.asrAutoTranscribe) {
+          const autoAsrTaskId = `asr-auto-${result.taskId}`
+          const formats = (settings.asrOutputFormats?.length ? settings.asrOutputFormats : ['txt', 'srt']) as Array<'txt' | 'srt' | 'vtt'>
+
+          window.electronAPI.startAsr(autoAsrTaskId, {
+            filePath: result.filePath,
+            language: settings.asrLanguage,
+            formats,
+            modelPath: settings.asrModelPath?.trim() || undefined,
+          }).then((asrResult) => {
+            if (!asrResult.success) {
+              console.error(`Auto ASR failed for ${result.taskId}:`, asrResult.error)
+            }
+          }).catch((error) => {
+            console.error(`Auto ASR failed for ${result.taskId}:`, error)
+          })
+        }
       } else {
         updateTask(result.taskId, {
           status: 'failed',
@@ -119,7 +138,7 @@ const App: React.FC = () => {
       unsubComplete()
       unsubUpdate()
     }
-  }, [updateTask, addToHistory, setYtdlpUpdateAvailable, setYtdlpLatestVersion])
+  }, [updateTask, addToHistory, settings, setYtdlpUpdateAvailable, setYtdlpLatestVersion])
 
   const renderPage = () => {
     switch (currentPage) {
@@ -151,4 +170,3 @@ const App: React.FC = () => {
 }
 
 export default App
-

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { X, FolderOpen, RotateCcw, CheckCircle, AlertCircle, Clock, Loader2 } from 'lucide-react'
 import { useDownloadStore, DownloadTask } from '../stores/downloadStore'
 
@@ -134,4 +134,3 @@ export const DownloadQueue: React.FC = () => {
     </div>
   )
 }
-

@@ -6,7 +6,10 @@ import { DownloadQueue } from '../components/DownloadQueue'
 import { useDownloadStore } from '../stores/downloadStore'
 
 export const HomePage: React.FC = () => {
-  const { currentVideoInfo, currentPlaylist, parseError, isParsing } = useDownloadStore()
+  const currentVideoInfo = useDownloadStore((state) => state.currentVideoInfo)
+  const currentPlaylist = useDownloadStore((state) => state.currentPlaylist)
+  const parseError = useDownloadStore((state) => state.parseError)
+  const isParsing = useDownloadStore((state) => state.isParsing)
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -39,4 +42,3 @@ export const HomePage: React.FC = () => {
     </div>
   )
 }
-

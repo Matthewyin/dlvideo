@@ -3,7 +3,8 @@ import { Settings, History, HelpCircle, PlayCircle, X } from 'lucide-react'
 import { useDownloadStore } from '../stores/downloadStore'
 
 export const Header: React.FC = () => {
-  const { currentPage, setCurrentPage } = useDownloadStore()
+  const currentPage = useDownloadStore((state) => state.currentPage)
+  const setCurrentPage = useDownloadStore((state) => state.setCurrentPage)
   const [showHelp, setShowHelp] = useState(false)
 
   return (
@@ -102,4 +103,3 @@ export const Header: React.FC = () => {
     </>
   )
 }
-

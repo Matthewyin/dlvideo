@@ -3,8 +3,9 @@ import { X, FolderOpen, RotateCcw, CheckCircle, AlertCircle, Clock, Loader2 } fr
 import { useDownloadStore, DownloadTask } from '../stores/downloadStore'
 
 // 单个下载任务项
-const DownloadItem: React.FC<{ task: DownloadTask }> = ({ task }) => {
-  const { updateTask, removeFromQueue } = useDownloadStore()
+const DownloadItem = React.memo(({ task }: { task: DownloadTask }) => {
+  const updateTask = useDownloadStore((state) => state.updateTask)
+  const removeFromQueue = useDownloadStore((state) => state.removeFromQueue)
 
   // 重试
   const retry = () => {
@@ -97,10 +98,11 @@ const DownloadItem: React.FC<{ task: DownloadTask }> = ({ task }) => {
       </div>
     </div>
   )
-}
+})
 
 export const DownloadQueue: React.FC = () => {
-  const { downloadQueue, clearCompleted } = useDownloadStore()
+  const downloadQueue = useDownloadStore((state) => state.downloadQueue)
+  const clearCompleted = useDownloadStore((state) => state.clearCompleted)
 
   const activeCount = downloadQueue.filter(t => t.status === 'downloading' || t.status === 'pending').length
   const completedCount = downloadQueue.filter(t => t.status === 'completed').length

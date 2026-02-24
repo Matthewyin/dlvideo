@@ -23,7 +23,12 @@ interface AsrAvailability {
 }
 
 export const HistoryPage: React.FC = () => {
-  const { setCurrentPage, historyList, historyLoading, loadHistory, removeFromHistory, clearAllHistory, searchHistory, settings } = useDownloadStore()
+  const setCurrentPage = useDownloadStore((state) => state.setCurrentPage)
+  const historyList = useDownloadStore((state) => state.historyList)
+  const historyLoading = useDownloadStore((state) => state.historyLoading)
+  const removeFromHistory = useDownloadStore((state) => state.removeFromHistory)
+  const clearAllHistory = useDownloadStore((state) => state.clearAllHistory)
+  const settings = useDownloadStore((state) => state.settings)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'video' | 'audio'>('all')
   const [asrStates, setAsrStates] = useState<Record<string, AsrUiState>>({})
@@ -92,8 +97,8 @@ export const HistoryPage: React.FC = () => {
 
   // 加载历史记录
   useEffect(() => {
-    loadHistory()
-  }, [loadHistory])
+    useDownloadStore.getState().loadHistory()
+  }, [])
 
   useEffect(() => {
     refreshAsrStatus().catch(() => {
@@ -153,10 +158,14 @@ export const HistoryPage: React.FC = () => {
   // 搜索防抖
   useEffect(() => {
     const timer = setTimeout(() => {
-      searchHistory(searchQuery)
+      if (searchQuery.trim()) {
+        useDownloadStore.getState().searchHistory(searchQuery)
+      } else {
+        useDownloadStore.getState().loadHistory()
+      }
     }, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery, searchHistory])
+  }, [searchQuery])
 
   // 过滤结果
   const filteredHistory = historyList.filter(item => {
@@ -309,7 +318,7 @@ export const HistoryPage: React.FC = () => {
       </div>
 
       {/* 历史记录列表 */}
-      {historyLoading ? (
+      {historyLoading && historyList.length === 0 ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>

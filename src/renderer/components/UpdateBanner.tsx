@@ -7,7 +7,8 @@ interface UpdateBannerProps {
 }
 
 export const UpdateBanner: React.FC<UpdateBannerProps> = ({ version }) => {
-  const { setCurrentPage, setYtdlpUpdateAvailable } = useDownloadStore()
+  const setCurrentPage = useDownloadStore((state) => state.setCurrentPage)
+  const setYtdlpUpdateAvailable = useDownloadStore((state) => state.setYtdlpUpdateAvailable)
 
   const handleDismiss = () => {
     setYtdlpUpdateAvailable(false)

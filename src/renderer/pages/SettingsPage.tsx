@@ -3,7 +3,10 @@ import { FolderOpen, Download, Globe, Bell, ArrowLeft, LogOut, CheckCircle, Load
 import { useDownloadStore, Settings } from '../stores/downloadStore'
 
 export const SettingsPage: React.FC = () => {
-  const { settings, updateSettings, saveSettings, setCurrentPage } = useDownloadStore()
+  const settings = useDownloadStore((state) => state.settings)
+  const updateSettings = useDownloadStore((state) => state.updateSettings)
+  const saveSettings = useDownloadStore((state) => state.saveSettings)
+  const setCurrentPage = useDownloadStore((state) => state.setCurrentPage)
   const [youtubeLoggedIn, setYoutubeLoggedIn] = useState(false)
   const [bilibiliLoggedIn, setBilibiliLoggedIn] = useState(false)
   const [checkingLogin, setCheckingLogin] = useState(true)

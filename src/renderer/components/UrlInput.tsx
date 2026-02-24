@@ -3,12 +3,15 @@ import { Link, Loader2, Search } from 'lucide-react'
 import { useDownloadStore } from '../stores/downloadStore'
 
 export const UrlInput: React.FC = () => {
-  const {
-    currentUrl, setCurrentUrl, isParsing, setIsParsing,
-    setCurrentVideoInfo, setParseError,
-    setCurrentPlaylist, setSelectedPlaylistVideos,
-    addToQueue
-  } = useDownloadStore()
+  const currentUrl = useDownloadStore((state) => state.currentUrl)
+  const setCurrentUrl = useDownloadStore((state) => state.setCurrentUrl)
+  const isParsing = useDownloadStore((state) => state.isParsing)
+  const setIsParsing = useDownloadStore((state) => state.setIsParsing)
+  const setCurrentVideoInfo = useDownloadStore((state) => state.setCurrentVideoInfo)
+  const setParseError = useDownloadStore((state) => state.setParseError)
+  const setCurrentPlaylist = useDownloadStore((state) => state.setCurrentPlaylist)
+  const setSelectedPlaylistVideos = useDownloadStore((state) => state.setSelectedPlaylistVideos)
+  const addToQueue = useDownloadStore((state) => state.addToQueue)
   const [inputValue, setInputValue] = useState(currentUrl)
 
   // 验证YouTube URL

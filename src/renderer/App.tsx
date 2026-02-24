@@ -8,7 +8,15 @@ import { HistoryPage } from './pages/HistoryPage'
 import { useDownloadStore, initializeApp } from './stores/downloadStore'
 
 const App: React.FC = () => {
-  const { currentPage, setCurrentPage, updateTask, addToHistory, clearCompleted, settings, ytdlpUpdateAvailable, ytdlpLatestVersion, setYtdlpUpdateAvailable, setYtdlpLatestVersion } = useDownloadStore()
+  const currentPage = useDownloadStore((state) => state.currentPage)
+  const setCurrentPage = useDownloadStore((state) => state.setCurrentPage)
+  const updateTask = useDownloadStore((state) => state.updateTask)
+  const addToHistory = useDownloadStore((state) => state.addToHistory)
+  const clearCompleted = useDownloadStore((state) => state.clearCompleted)
+  const ytdlpUpdateAvailable = useDownloadStore((state) => state.ytdlpUpdateAvailable)
+  const ytdlpLatestVersion = useDownloadStore((state) => state.ytdlpLatestVersion)
+  const setYtdlpUpdateAvailable = useDownloadStore((state) => state.setYtdlpUpdateAvailable)
+  const setYtdlpLatestVersion = useDownloadStore((state) => state.setYtdlpLatestVersion)
 
   // 全局快捷键支持
   useEffect(() => {
@@ -55,7 +63,10 @@ const App: React.FC = () => {
   useEffect(() => {
     // 初始化应用（加载设置和历史）
     initializeApp()
+  }, [])
 
+  // 监听下载与更新事件
+  useEffect(() => {
     // 监听下载进度
     const unsubProgress = window.electronAPI.onDownloadProgress((progress) => {
       updateTask(progress.taskId, {
@@ -99,15 +110,16 @@ const App: React.FC = () => {
         }
 
         // 可选：下载完成后自动转写（ASR）
-        if (result.filePath && settings.asrEnabled && settings.asrAutoTranscribe) {
+        const currentSettings = useDownloadStore.getState().settings
+        if (result.filePath && currentSettings.asrEnabled && currentSettings.asrAutoTranscribe) {
           const autoAsrTaskId = `asr-auto-${result.taskId}`
-          const formats = (settings.asrOutputFormats?.length ? settings.asrOutputFormats : ['txt', 'srt']) as Array<'txt' | 'srt' | 'vtt'>
+          const formats = (currentSettings.asrOutputFormats?.length ? currentSettings.asrOutputFormats : ['txt', 'srt']) as Array<'txt' | 'srt' | 'vtt'>
 
           window.electronAPI.startAsr(autoAsrTaskId, {
             filePath: result.filePath,
-            language: settings.asrLanguage,
+            language: currentSettings.asrLanguage,
             formats,
-            modelPath: settings.asrModelPath?.trim() || undefined,
+            modelPath: currentSettings.asrModelPath?.trim() || undefined,
           }).then((asrResult) => {
             if (!asrResult.success) {
               console.error(`Auto ASR failed for ${result.taskId}:`, asrResult.error)
@@ -138,18 +150,7 @@ const App: React.FC = () => {
       unsubComplete()
       unsubUpdate()
     }
-  }, [updateTask, addToHistory, settings, setYtdlpUpdateAvailable, setYtdlpLatestVersion])
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'settings':
-        return <SettingsPage />
-      case 'history':
-        return <HistoryPage />
-      default:
-        return <HomePage />
-    }
-  }
+  }, [updateTask, addToHistory, setYtdlpUpdateAvailable, setYtdlpLatestVersion])
 
   return (
     <div className="h-screen flex flex-col bg-surface text-text-primary">
@@ -161,7 +162,15 @@ const App: React.FC = () => {
       <Header />
 
       <main className="flex-1 overflow-y-auto">
-        {renderPage()}
+        <div className={currentPage === 'home' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'home'}>
+          <HomePage />
+        </div>
+        <div className={currentPage === 'history' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'history'}>
+          <HistoryPage />
+        </div>
+        <div className={currentPage === 'settings' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'settings'}>
+          <SettingsPage />
+        </div>
       </main>
 
       <Footer />

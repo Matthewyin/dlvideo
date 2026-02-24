@@ -3,17 +3,15 @@ import { Clock, User, ListVideo, Download, CheckSquare, Square, Music, X } from 
 import { useDownloadStore, VideoInfo, DownloadTask } from '../stores/downloadStore'
 
 export const PlaylistPreview: React.FC = () => {
-  const {
-    currentPlaylist,
-    selectedPlaylistVideos,
-    togglePlaylistVideo,
-    selectAllPlaylistVideos,
-    deselectAllPlaylistVideos,
-    addBatchToQueue,
-    updateTask,
-    settings,
-    setCurrentPlaylist,
-  } = useDownloadStore()
+  const currentPlaylist = useDownloadStore((state) => state.currentPlaylist)
+  const selectedPlaylistVideos = useDownloadStore((state) => state.selectedPlaylistVideos)
+  const togglePlaylistVideo = useDownloadStore((state) => state.togglePlaylistVideo)
+  const selectAllPlaylistVideos = useDownloadStore((state) => state.selectAllPlaylistVideos)
+  const deselectAllPlaylistVideos = useDownloadStore((state) => state.deselectAllPlaylistVideos)
+  const addBatchToQueue = useDownloadStore((state) => state.addBatchToQueue)
+  const updateTask = useDownloadStore((state) => state.updateTask)
+  const settings = useDownloadStore((state) => state.settings)
+  const setCurrentPlaylist = useDownloadStore((state) => state.setCurrentPlaylist)
 
   const [audioOnly, setAudioOnly] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -172,7 +170,7 @@ interface VideoItemProps {
   formatDuration: (seconds: number) => string
 }
 
-const VideoItem: React.FC<VideoItemProps> = ({ video, index, selected, onToggle, formatDuration }) => {
+const VideoItem = React.memo(({ video, index, selected, onToggle, formatDuration }: VideoItemProps) => {
   return (
     <div
       onClick={onToggle}
@@ -196,5 +194,4 @@ const VideoItem: React.FC<VideoItemProps> = ({ video, index, selected, onToggle,
       </div>
     </div>
   )
-}
-
+})

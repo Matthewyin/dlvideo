@@ -13,8 +13,12 @@
  - **格式转换** - 支持多种格式转换（MP4、MKV、WebM）
  - **代理支持** - 支持 HTTP/SOCKS 代理配置
  - **下载历史** - 记录下载历史，方便查找
+ - **离线语音转文字（ASR）** - 支持对已下载视频/音频进行本地转写，输出 TXT/SRT/VTT
+ - **ASR 自动补救** - 可配置下载完成后自动转写，适用于无字幕视频
+ - **ASR 模型一键下载** - 应用内下载 `ggml-base.bin` 模型并检查运行环境
  - **Cookies 管理** - 支持导入 Cookies 用于受限视频下载
  - **yt-dlp 自动更新** - 应用启动时静默检查更新，有新版本时显示通知
+ - **下载稳定性优化** - 内置下载并发调度与更稳的默认并发参数，降低 YouTube 429 触发概率
 
 ## 技术栈
 
@@ -29,6 +33,7 @@
  - **aria2c** - 高速多线程下载（已内置）
  - **Deno** - JavaScript 运行时（已内置，用于解决 YouTube JS challenge）
  - **better-sqlite3** - 本地数据库
+ - **whisper.cpp** - 本地离线 ASR 引擎（支持内置 `whisper-cli`）
 
 ## 安装
 
@@ -50,8 +55,8 @@ cd dlvideo
 # 安装依赖
 npm install
 
-# 开发模式运行
-npm run dev
+# 开发模式运行（Electron + Vite）
+npm run electron:dev
 
 # 构建生产版本
 npm run electron:build
@@ -63,6 +68,7 @@ npm run electron:build
 2. **选择配置** - 选择视频格式、分辨率等下载选项
 3. **开始下载** - 点击下载按钮开始下载
 4. **查看进度** - 在下载队列中查看下载进度
+5. **历史转写（可选）** - 在「历史」页面点击 ASR 按钮将语音转为文字/字幕
 
 ### 支持的链接格式
 
@@ -86,6 +92,7 @@ npm run electron:build
  - **代理服务器** - HTTP/SOCKS 代理地址（如 `http://127.0.0.1:7890`）
  - **Cookies 来源** - 选择浏览器或手动导入 Cookies 文件
  - **yt-dlp 更新** - 查看当前版本并手动更新
+ - **ASR 设置** - 启用 ASR、自动转写、转写语言、输出格式、模型路径
 
 ## Cookies 管理
 
@@ -102,7 +109,10 @@ npm run electron:build
 # 安装依赖
 npm install
 
-# 启动开发服务器
+# 启动完整开发环境（推荐）
+npm run electron:dev
+
+# 仅启动渲染进程（Vite）
 npm run dev
 
 # 构建渲染进程

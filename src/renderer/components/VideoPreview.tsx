@@ -39,7 +39,12 @@ const VIDEO_CONVERT_FORMATS = [
 ]
 
 export const VideoPreview: React.FC = () => {
-  const { currentVideoInfo, addToQueue, parseError, settings, updateTask, setCurrentVideoInfo } = useDownloadStore()
+  const currentVideoInfo = useDownloadStore((state) => state.currentVideoInfo)
+  const addToQueue = useDownloadStore((state) => state.addToQueue)
+  const parseError = useDownloadStore((state) => state.parseError)
+  const settings = useDownloadStore((state) => state.settings)
+  const updateTask = useDownloadStore((state) => state.updateTask)
+  const setCurrentVideoInfo = useDownloadStore((state) => state.setCurrentVideoInfo)
   const [selectedFormat, setSelectedFormat] = useState<string>('mp4')
   const [selectedResolution, setSelectedResolution] = useState<string>('')
   const [audioOnly, setAudioOnly] = useState(false)

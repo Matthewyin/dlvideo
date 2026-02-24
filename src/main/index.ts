@@ -16,8 +16,8 @@ const BILIBILI_COOKIES_FILE_PATH = path.join(app.getPath('userData'), 'bilibili_
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// 开发环境判断
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
+// 开发环境判断（打包版必须始终走生产加载路径，避免被外部 NODE_ENV 污染）
+const isDev = !app.isPackaged
 
 // 默认下载路径
 const DEFAULT_DOWNLOAD_PATH = path.join(os.homedir(), 'Downloads', 'DLVideo')

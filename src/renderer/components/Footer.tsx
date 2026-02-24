@@ -6,7 +6,7 @@ export const Footer: React.FC = () => {
     <footer className="px-6 py-3 bg-surface-secondary border-t border-border">
       <div className="flex items-center justify-between text-xs text-text-tertiary">
         <div className="flex items-center gap-4">
-          <span>DLVideo v1.0.0</span>
+          <span>DLVideo v2.0.0</span>
         </div>
 
         <div className="flex items-center gap-4">
@@ -25,4 +25,3 @@ export const Footer: React.FC = () => {
     </footer>
   )
 }
-

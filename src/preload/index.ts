@@ -105,12 +105,15 @@ interface AsrStatus {
   available: boolean
   whisperBinary?: string | null
   modelPath?: string | null
+  vadModelPath?: string | null
   defaultModelPath?: string
+  defaultVadModelPath?: string
   modelDownloadInProgress?: boolean
   currentModelDownloadTaskId?: string | null
   missing?: {
     whisperBinary: boolean
     modelPath: boolean
+    vadModelPath?: boolean
   }
   error?: string
 }
@@ -142,6 +145,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 选择 ASR 模型文件
   selectAsrModelFile: () => ipcRenderer.invoke('select-asr-model-file'),
+
+  // 选择本地媒体文件（ASR 文本转写）
+  selectAsrMediaFile: () => ipcRenderer.invoke('select-asr-media-file'),
 
   // 打开文件夹
   openFolder: (path: string) => ipcRenderer.invoke('open-folder', path),
@@ -295,6 +301,7 @@ declare global {
       selectDownloadPath: () => Promise<string | null>
       getDefaultDownloadPath: () => Promise<string>
       selectAsrModelFile: () => Promise<string | null>
+      selectAsrMediaFile: () => Promise<string | null>
       openFolder: (path: string) => Promise<void>
       showItemInFolder: (path: string) => Promise<void>
       parseVideo: (url: string) => Promise<{ success: boolean; data?: any; isPlaylist?: boolean; error?: string }>

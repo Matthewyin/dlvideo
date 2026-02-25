@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Settings, History, HelpCircle, PlayCircle, X } from 'lucide-react'
+import { Settings, History, HelpCircle, PlayCircle, X, Mic } from 'lucide-react'
 import { useDownloadStore } from '../stores/downloadStore'
 
 export const Header: React.FC = () => {
@@ -43,6 +43,17 @@ export const Header: React.FC = () => {
           >
             <History className="w-4 h-4" />
             历史
+          </button>
+          <button
+            onClick={() => setCurrentPage('transcribe')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+              currentPage === 'transcribe'
+                ? 'bg-primary text-text-inverse'
+                : 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+            }`}
+          >
+            <Mic className="w-4 h-4" />
+            转写
           </button>
           <button
             onClick={() => setCurrentPage('settings')}
@@ -95,6 +106,10 @@ export const Header: React.FC = () => {
               <div>
                 <h3 className="font-medium text-text-primary mb-1">历史</h3>
                 <p>查看下载历史记录，支持打开文件所在目录</p>
+              </div>
+              <div>
+                <h3 className="font-medium text-text-primary mb-1">文本转写</h3>
+                <p>选择本地视频/音频文件，生成 TXT/SRT/VTT 到原文件同目录</p>
               </div>
             </div>
           </div>

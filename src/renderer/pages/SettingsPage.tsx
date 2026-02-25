@@ -19,7 +19,9 @@ export const SettingsPage: React.FC = () => {
     message: string | null
     missingWhisperBinary?: boolean
     missingModel?: boolean
+    missingVadModel?: boolean
     defaultModelPath?: string
+    defaultVadModelPath?: string
   }>({
     checked: false,
     available: false,
@@ -31,7 +33,7 @@ export const SettingsPage: React.FC = () => {
     message?: string
   }>({ inProgress: false })
 
-  const asrModelDownloadTaskId = 'asr-model-base-settings'
+  const asrModelDownloadTaskId = 'asr-model-medium-settings'
 
   const refreshAsrStatus = useCallback(async () => {
     try {
@@ -43,14 +45,17 @@ export const SettingsPage: React.FC = () => {
           message: null,
           missingWhisperBinary: false,
           missingModel: false,
+          missingVadModel: false,
           defaultModelPath: status.defaultModelPath,
+          defaultVadModelPath: status.defaultVadModelPath,
         })
         return
       }
 
       const tips: string[] = []
       if (status.missing?.whisperBinary) tips.push('缺少 whisper-cli')
-      if (status.missing?.modelPath) tips.push('缺少 ggml-base.bin 模型')
+      if (status.missing?.modelPath) tips.push('缺少 ggml-medium.bin 模型')
+      if (status.missing?.vadModelPath) tips.push('缺少 VAD 模型（ggml-silero-v5.1.2.bin）')
 
       setAsrStatus({
         checked: true,
@@ -58,7 +63,9 @@ export const SettingsPage: React.FC = () => {
         message: status.error || (tips.length > 0 ? tips.join('，') : 'ASR 不可用'),
         missingWhisperBinary: status.missing?.whisperBinary,
         missingModel: status.missing?.modelPath,
+        missingVadModel: status.missing?.vadModelPath,
         defaultModelPath: status.defaultModelPath,
+        defaultVadModelPath: status.defaultVadModelPath,
       })
     } catch (error) {
       setAsrStatus({
@@ -369,7 +376,7 @@ export const SettingsPage: React.FC = () => {
                   type="text"
                   value={settings.asrModelPath}
                   onChange={(e) => handleUpdateSettings({ asrModelPath: e.target.value })}
-                  placeholder={asrStatus.defaultModelPath || '留空使用自动检测的 ggml-base.bin'}
+                  placeholder={asrStatus.defaultModelPath || '留空使用自动检测的 ggml-medium.bin'}
                   disabled={!settings.asrEnabled}
                   className="flex-1 px-4 py-2.5 bg-surface-tertiary border border-border rounded-lg text-text-primary text-sm focus:outline-none focus:border-primary placeholder-text-tertiary disabled:opacity-50"
                 />
@@ -401,19 +408,27 @@ export const SettingsPage: React.FC = () => {
                 {asrStatus.missingWhisperBinary && (
                   <p className="text-xs mt-2">缺少 `whisper-cli`。如果发布包已内置到 `resources/bin`，重启应用后会自动识别；开发环境可用 Homebrew 安装。</p>
                 )}
-                {asrStatus.missingModel && (
+                {(asrStatus.missingModel || asrStatus.missingVadModel) && (
                   <div className="mt-2 space-y-2">
-                    <p className="text-xs">
-                      缺少模型 `ggml-base.bin`
-                      {asrStatus.defaultModelPath ? `（默认下载到：${asrStatus.defaultModelPath}）` : ''}
-                    </p>
+                    {asrStatus.missingModel && (
+                      <p className="text-xs">
+                        缺少模型 `ggml-medium.bin`
+                        {asrStatus.defaultModelPath ? `（默认下载到：${asrStatus.defaultModelPath}）` : ''}
+                      </p>
+                    )}
+                    {asrStatus.missingVadModel && (
+                      <p className="text-xs">
+                        同时缺少 VAD 模型 `ggml-silero-v5.1.2.bin`
+                        {asrStatus.defaultVadModelPath ? `（默认下载到：${asrStatus.defaultVadModelPath}）` : ''}
+                      </p>
+                    )}
                     <div className="flex items-center gap-3 flex-wrap">
                       <button
                         onClick={handleDownloadAsrModel}
                         disabled={asrModelDownloadState.inProgress}
                         className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
                       >
-                        {asrModelDownloadState.inProgress ? '下载模型中...' : '一键下载 base 模型'}
+                        {asrModelDownloadState.inProgress ? '下载模型中...' : '一键下载 medium + VAD 模型'}
                       </button>
                       {asrModelDownloadState.message && (
                         <span className="text-xs">

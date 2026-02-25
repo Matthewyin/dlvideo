@@ -148,8 +148,8 @@ interface DownloadState {
   searchHistory: (query: string) => Promise<void>
 
   // 当前页面
-  currentPage: 'home' | 'settings' | 'history'
-  setCurrentPage: (page: 'home' | 'settings' | 'history') => void
+  currentPage: 'home' | 'settings' | 'history' | 'transcribe'
+  setCurrentPage: (page: 'home' | 'settings' | 'history' | 'transcribe') => void
 
   // yt-dlp 更新通知
   ytdlpUpdateAvailable: boolean

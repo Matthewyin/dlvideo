@@ -67,6 +67,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "resources/lib",
+        "to": "lib",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "mac": {

@@ -145,8 +145,16 @@ app.on('before-quit', () => {
 
 // IPC 处理器 - 选择下载目录
 ipcMain.handle('select-download-path', async () => {
+  const properties: Electron.OpenDialogOptions['properties'] = ['openDirectory']
+
+  if (process.platform === 'darwin') {
+    properties.push('createDirectory')
+  } else if (process.platform === 'win32') {
+    properties.push('promptToCreate')
+  }
+
   const result = await dialog.showOpenDialog(mainWindow!, {
-    properties: ['openDirectory'],
+    properties,
     title: '选择下载目录',
     defaultPath: DEFAULT_DOWNLOAD_PATH,
   })
@@ -160,6 +168,21 @@ ipcMain.handle('select-asr-model-file', async () => {
     title: '选择 ASR 模型文件 (ggml-*.bin)',
     filters: [
       { name: 'Whisper 模型文件', extensions: ['bin'] },
+      { name: '所有文件', extensions: ['*'] },
+    ],
+  })
+  return result.canceled ? null : result.filePaths[0]
+})
+
+// IPC 处理器 - 选择本地媒体文件（用于文本转写）
+ipcMain.handle('select-asr-media-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openFile'],
+    title: '选择要转写的视频/音频文件',
+    filters: [
+      { name: '媒体文件', extensions: ['mp4', 'mov', 'mkv', 'webm', 'avi', 'mp3', 'm4a', 'wav', 'flac', 'aac', 'ogg'] },
+      { name: '视频文件', extensions: ['mp4', 'mov', 'mkv', 'webm', 'avi'] },
+      { name: '音频文件', extensions: ['mp3', 'm4a', 'wav', 'flac', 'aac', 'ogg'] },
       { name: '所有文件', extensions: ['*'] },
     ],
   })
@@ -351,7 +374,7 @@ ipcMain.handle('cancel-asr', (_, taskId: string) => {
 
 ipcMain.handle('download-asr-model', async (_, taskId: string) => {
   try {
-    return await asrService.downloadBaseModel(taskId)
+    return await asrService.downloadDefaultModels(taskId)
   } catch (error) {
     return {
       taskId,

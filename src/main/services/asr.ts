@@ -55,6 +55,11 @@ interface PendingAsrTask {
   resolve: (result: AsrResult) => void
 }
 
+const DEFAULT_WHISPER_MODEL_FILE = 'ggml-medium.bin'
+const DEFAULT_VAD_MODEL_FILE = 'ggml-silero-v5.1.2.bin'
+const WHISPER_MODEL_DOWNLOAD_URL = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${DEFAULT_WHISPER_MODEL_FILE}`
+const VAD_MODEL_DOWNLOAD_URL = `https://huggingface.co/ggml-org/whisper-vad/resolve/main/${DEFAULT_VAD_MODEL_FILE}`
+
 class AsrService extends EventEmitter {
   private pendingQueue: PendingAsrTask[] = []
   private queuedTaskIds: Set<string> = new Set()
@@ -107,23 +112,28 @@ class AsrService extends EventEmitter {
     const resolvedModel = normalizedOverride
       ? (overrideExists ? normalizedOverride : null)
       : this.findModelPath()
+    const resolvedVadModel = this.findVadModelPath()
     const defaultModelPath = this.getDefaultModelPath()
+    const defaultVadModelPath = this.getDefaultVadModelPath()
     return {
-      available: Boolean(resolvedBinary && resolvedModel),
+      available: Boolean(resolvedBinary && resolvedModel && resolvedVadModel),
       whisperBinary: resolvedBinary,
       modelPath: resolvedModel,
+      vadModelPath: resolvedVadModel,
       defaultModelPath,
+      defaultVadModelPath,
       modelDownloadInProgress: this.modelDownloadInProgress,
       currentModelDownloadTaskId: this.currentModelDownloadTaskId,
       missing: {
         whisperBinary: !resolvedBinary,
         modelPath: !resolvedModel,
+        vadModelPath: !resolvedVadModel,
       },
       error: normalizedOverride && !overrideExists ? '自定义模型路径不存在' : undefined,
     }
   }
 
-  async downloadBaseModel(taskId: string): Promise<AsrModelDownloadResult> {
+  async downloadDefaultModels(taskId: string): Promise<AsrModelDownloadResult> {
     if (this.modelDownloadInProgress) {
       return {
         taskId,
@@ -133,7 +143,11 @@ class AsrService extends EventEmitter {
     }
 
     const targetPath = this.getDefaultModelPath()
-    if (fs.existsSync(targetPath)) {
+    const vadTargetPath = this.getDefaultVadModelPath()
+    const needWhisperModel = !fs.existsSync(targetPath)
+    const needVadModel = !fs.existsSync(vadTargetPath)
+
+    if (!needWhisperModel && !needVadModel) {
       const result: AsrModelDownloadResult = {
         taskId,
         success: true,
@@ -147,36 +161,70 @@ class AsrService extends EventEmitter {
     this.currentModelDownloadTaskId = taskId
 
     const tempPath = `${targetPath}.download`
+    const vadTempPath = `${vadTargetPath}.download`
     fs.mkdirSync(path.dirname(targetPath), { recursive: true })
+    fs.mkdirSync(path.dirname(vadTargetPath), { recursive: true })
 
     try {
-      this.emit('model-download-progress', {
-        taskId,
-        stage: 'starting',
-        downloadedBytes: 0,
-        message: '开始下载 ASR 模型（ggml-base.bin）...',
-        targetPath,
-      } as AsrModelDownloadProgress)
+      if (needWhisperModel) {
+        this.emit('model-download-progress', {
+          taskId,
+          stage: 'starting',
+          downloadedBytes: 0,
+          message: `开始下载 ASR 模型（${DEFAULT_WHISPER_MODEL_FILE}）...`,
+          targetPath,
+        } as AsrModelDownloadProgress)
 
-      await this.downloadToFile(
-        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
-        tempPath,
-        (downloadedBytes, totalBytes) => {
-          this.emit('model-download-progress', {
-            taskId,
-            stage: 'downloading',
-            downloadedBytes,
-            totalBytes,
-            percent: totalBytes ? Math.round((downloadedBytes / totalBytes) * 100) : undefined,
-            message: totalBytes
-              ? `正在下载模型... ${Math.round((downloadedBytes / totalBytes) * 100)}%`
-              : '正在下载模型...',
-            targetPath,
-          } as AsrModelDownloadProgress)
-        }
-      )
+        await this.downloadToFile(
+          WHISPER_MODEL_DOWNLOAD_URL,
+          tempPath,
+          (downloadedBytes, totalBytes) => {
+            this.emit('model-download-progress', {
+              taskId,
+              stage: 'downloading',
+              downloadedBytes,
+              totalBytes,
+              percent: totalBytes ? Math.round((downloadedBytes / totalBytes) * 100) : undefined,
+              message: totalBytes
+                ? `正在下载 ASR 模型（medium）... ${Math.round((downloadedBytes / totalBytes) * 100)}%`
+                : '正在下载 ASR 模型（medium）...',
+              targetPath,
+            } as AsrModelDownloadProgress)
+          }
+        )
 
-      fs.renameSync(tempPath, targetPath)
+        fs.renameSync(tempPath, targetPath)
+      }
+
+      if (needVadModel) {
+        this.emit('model-download-progress', {
+          taskId,
+          stage: 'starting',
+          downloadedBytes: 0,
+          message: `开始下载 VAD 模型（${DEFAULT_VAD_MODEL_FILE}）...`,
+          targetPath: vadTargetPath,
+        } as AsrModelDownloadProgress)
+
+        await this.downloadToFile(
+          VAD_MODEL_DOWNLOAD_URL,
+          vadTempPath,
+          (downloadedBytes, totalBytes) => {
+            this.emit('model-download-progress', {
+              taskId,
+              stage: 'downloading',
+              downloadedBytes,
+              totalBytes,
+              percent: totalBytes ? Math.round((downloadedBytes / totalBytes) * 100) : undefined,
+              message: totalBytes
+                ? `正在下载 VAD 模型... ${Math.round((downloadedBytes / totalBytes) * 100)}%`
+                : '正在下载 VAD 模型...',
+              targetPath: vadTargetPath,
+            } as AsrModelDownloadProgress)
+          }
+        )
+
+        fs.renameSync(vadTempPath, vadTargetPath)
+      }
 
       const result: AsrModelDownloadResult = {
         taskId,
@@ -188,6 +236,11 @@ class AsrService extends EventEmitter {
     } catch (error) {
       try {
         fs.rmSync(tempPath, { force: true })
+      } catch {
+        // ignore cleanup error
+      }
+      try {
+        fs.rmSync(vadTempPath, { force: true })
       } catch {
         // ignore cleanup error
       }
@@ -276,6 +329,7 @@ class AsrService extends EventEmitter {
 
       const whisperBinary = this.resolveWhisperBinary()
       const modelPath = this.resolveModelPath(options.modelPath)
+      const vadModelPath = this.resolveVadModelPath()
       const formats = options.formats?.length ? options.formats : ['txt', 'srt']
 
       fs.mkdirSync(tempDir, { recursive: true })
@@ -293,6 +347,7 @@ class AsrService extends EventEmitter {
           '-y',
           '-i', options.filePath,
           '-vn',
+          '-af', 'highpass=f=80,lowpass=f=7000,afftdn=nf=-25',
           '-ac', '1',
           '-ar', '16000',
           '-c:a', 'pcm_s16le',
@@ -308,7 +363,7 @@ class AsrService extends EventEmitter {
       this.emit('progress', {
         taskId,
         stage: 'transcribing',
-        message: '正在语音转文字...',
+        message: '正在语音转文字（VAD + medium）...',
       } as AsrProgress)
 
       const whisperArgs: string[] = [
@@ -317,9 +372,10 @@ class AsrService extends EventEmitter {
         '-of', outputPrefix,
       ]
 
-      if (options.language && options.language !== 'auto') {
-        whisperArgs.push('-l', options.language)
-      }
+      // whisper-cli 在未传 -l 时默认使用英文；要显式传入 auto 才会自动识别语言
+      const language = options.language?.trim()
+      whisperArgs.push('-l', language && language !== '' ? language : 'auto')
+      whisperArgs.push('--vad', '--vad-model', vadModelPath, '--suppress-nst')
 
       if (formats.includes('txt')) whisperArgs.push('-otxt')
       if (formats.includes('srt')) whisperArgs.push('-osrt')
@@ -388,12 +444,12 @@ class AsrService extends EventEmitter {
   private findModelPath(): string | null {
     const home = os.homedir()
     const candidates = [
-      path.join(app.getPath('userData'), 'models', 'whisper', 'ggml-base.bin'),
-      path.join(process.resourcesPath, 'models', 'ggml-base.bin'),
-      path.join(app.getAppPath(), 'resources', 'models', 'ggml-base.bin'),
-      path.join(home, '.cache', 'whisper.cpp', 'ggml-base.bin'),
-      '/opt/homebrew/share/whisper/ggml-base.bin',
-      '/usr/local/share/whisper/ggml-base.bin',
+      path.join(app.getPath('userData'), 'models', 'whisper', DEFAULT_WHISPER_MODEL_FILE),
+      path.join(process.resourcesPath, 'models', DEFAULT_WHISPER_MODEL_FILE),
+      path.join(app.getAppPath(), 'resources', 'models', DEFAULT_WHISPER_MODEL_FILE),
+      path.join(home, '.cache', 'whisper.cpp', DEFAULT_WHISPER_MODEL_FILE),
+      path.join('/opt/homebrew/share/whisper', DEFAULT_WHISPER_MODEL_FILE),
+      path.join('/usr/local/share/whisper', DEFAULT_WHISPER_MODEL_FILE),
     ]
 
     for (const candidate of candidates) {
@@ -413,7 +469,7 @@ class AsrService extends EventEmitter {
     const detected = this.findModelPath()
     if (!detected) {
       throw new Error(
-        '未找到 whisper.cpp 模型（ggml-base.bin）。请将模型放到用户目录 models/whisper 或 ~/.cache/whisper.cpp'
+        `未找到 whisper.cpp 模型（${DEFAULT_WHISPER_MODEL_FILE}）。请在设置页一键下载模型，或放到用户目录 models/whisper / ~/.cache/whisper.cpp`
       )
     }
 
@@ -421,7 +477,38 @@ class AsrService extends EventEmitter {
   }
 
   private getDefaultModelPath(): string {
-    return path.join(app.getPath('userData'), 'models', 'whisper', 'ggml-base.bin')
+    return path.join(app.getPath('userData'), 'models', 'whisper', DEFAULT_WHISPER_MODEL_FILE)
+  }
+
+  private findVadModelPath(): string | null {
+    const home = os.homedir()
+    const candidates = [
+      path.join(app.getPath('userData'), 'models', 'whisper', DEFAULT_VAD_MODEL_FILE),
+      path.join(process.resourcesPath, 'models', DEFAULT_VAD_MODEL_FILE),
+      path.join(app.getAppPath(), 'resources', 'models', DEFAULT_VAD_MODEL_FILE),
+      path.join(home, '.cache', 'whisper.cpp', DEFAULT_VAD_MODEL_FILE),
+      path.join('/opt/homebrew/share/whisper', DEFAULT_VAD_MODEL_FILE),
+      path.join('/usr/local/share/whisper', DEFAULT_VAD_MODEL_FILE),
+    ]
+
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) return candidate
+    }
+    return null
+  }
+
+  private resolveVadModelPath(): string {
+    const detected = this.findVadModelPath()
+    if (!detected) {
+      throw new Error(
+        `未找到 whisper.cpp VAD 模型（${DEFAULT_VAD_MODEL_FILE}）。请在设置页一键下载 ASR 模型包（medium + VAD）`
+      )
+    }
+    return detected
+  }
+
+  private getDefaultVadModelPath(): string {
+    return path.join(app.getPath('userData'), 'models', 'whisper', DEFAULT_VAD_MODEL_FILE)
   }
 
   private async downloadToFile(
@@ -514,6 +601,15 @@ class AsrService extends EventEmitter {
       this.activeProcesses.set(taskId, proc)
 
       let stderrOutput = ''
+      let stdoutOutput = ''
+
+      // whisper-cli 会持续向 stdout 输出转写内容/进度。
+      // 如果不消费 stdout，长音频时可能因管道写满而阻塞子进程。
+      proc.stdout?.on('data', (chunk: Buffer) => {
+        if (stdoutOutput.length < 4096) {
+          stdoutOutput += chunk.toString()
+        }
+      })
 
       proc.stderr?.on('data', (chunk: Buffer) => {
         const text = chunk.toString()
@@ -528,7 +624,8 @@ class AsrService extends EventEmitter {
           resolve()
           return
         }
-        reject(new Error(`${toolName} 执行失败 (退出码: ${code})${stderrOutput ? `: ${stderrOutput.trim()}` : ''}`))
+        const details = [stderrOutput.trim(), stdoutOutput.trim()].filter(Boolean).join(' | ')
+        reject(new Error(`${toolName} 执行失败 (退出码: ${code})${details ? `: ${details}` : ''}`))
       })
 
       proc.on('error', (error) => {

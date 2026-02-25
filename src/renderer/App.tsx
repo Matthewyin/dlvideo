@@ -5,6 +5,7 @@ import { UpdateBanner } from './components/UpdateBanner'
 import { HomePage } from './pages/HomePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { HistoryPage } from './pages/HistoryPage'
+import { TranscribePage } from './pages/TranscribePage'
 import { useDownloadStore, initializeApp } from './stores/downloadStore'
 
 const App: React.FC = () => {
@@ -170,6 +171,9 @@ const App: React.FC = () => {
         </div>
         <div className={currentPage === 'settings' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'settings'}>
           <SettingsPage />
+        </div>
+        <div className={currentPage === 'transcribe' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'transcribe'}>
+          <TranscribePage />
         </div>
       </main>
 

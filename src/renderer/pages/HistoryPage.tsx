@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Search, FolderOpen, Trash2, Download, Loader2, FileText } from 'lucide-react'
+import { ArrowLeft, Search, FolderOpen, Trash2, Download, Loader2, FileText, Mic } from 'lucide-react'
 import { useDownloadStore } from '../stores/downloadStore'
 
 interface AsrUiState {
@@ -18,7 +18,9 @@ interface AsrAvailability {
   message: string | null
   missingWhisperBinary?: boolean
   missingModel?: boolean
+  missingVadModel?: boolean
   defaultModelPath?: string
+  defaultVadModelPath?: string
   modelDownloadInProgress?: boolean
 }
 
@@ -44,7 +46,7 @@ export const HistoryPage: React.FC = () => {
   }>({ inProgress: false })
 
   const getAsrTaskId = (historyId: string) => `asr-${historyId}`
-  const asrModelDownloadTaskId = 'asr-model-base'
+  const asrModelDownloadTaskId = 'asr-model-medium-history'
 
   const updateAsrState = useCallback((taskId: string, updates: Partial<AsrUiState>) => {
     setAsrStates((prev) => ({
@@ -67,7 +69,9 @@ export const HistoryPage: React.FC = () => {
           message: null,
           missingWhisperBinary: false,
           missingModel: false,
+          missingVadModel: false,
           defaultModelPath: status.defaultModelPath,
+          defaultVadModelPath: status.defaultVadModelPath,
           modelDownloadInProgress: status.modelDownloadInProgress,
         })
         return
@@ -75,7 +79,8 @@ export const HistoryPage: React.FC = () => {
 
       const tips: string[] = []
       if (status.missing?.whisperBinary) tips.push('缺少 whisper-cli')
-      if (status.missing?.modelPath) tips.push('缺少 ggml-base.bin 模型')
+      if (status.missing?.modelPath) tips.push('缺少 ggml-medium.bin 模型')
+      if (status.missing?.vadModelPath) tips.push('缺少 VAD 模型（ggml-silero-v5.1.2.bin）')
 
       setAsrAvailability({
         checked: true,
@@ -83,7 +88,9 @@ export const HistoryPage: React.FC = () => {
         message: status.error || (tips.length > 0 ? tips.join('，') : 'ASR 不可用'),
         missingWhisperBinary: status.missing?.whisperBinary,
         missingModel: status.missing?.modelPath,
+        missingVadModel: status.missing?.vadModelPath,
         defaultModelPath: status.defaultModelPath,
+        defaultVadModelPath: status.defaultVadModelPath,
         modelDownloadInProgress: status.modelDownloadInProgress,
       })
     } catch (error) {
@@ -252,28 +259,34 @@ export const HistoryPage: React.FC = () => {
             <span>{asrAvailability.message || '环境未就绪'}</span>
           </div>
 
-          {(asrAvailability.missingWhisperBinary || asrAvailability.missingModel) && (
+          {(asrAvailability.missingWhisperBinary || asrAvailability.missingModel || asrAvailability.missingVadModel) && (
             <div className="text-xs text-amber-700 space-y-1">
               {asrAvailability.missingWhisperBinary && (
                 <p>需要先安装 whisper.cpp CLI（命令名 `whisper-cli`，可通过 Homebrew 安装）。</p>
               )}
               {asrAvailability.missingModel && (
                 <p>
-                  缺少 ASR 模型 `ggml-base.bin`
+                  缺少 ASR 模型 `ggml-medium.bin`
                   {asrAvailability.defaultModelPath ? `（将下载到：${asrAvailability.defaultModelPath}）` : ''}
+                </p>
+              )}
+              {asrAvailability.missingVadModel && (
+                <p>
+                  缺少 VAD 模型 `ggml-silero-v5.1.2.bin`
+                  {asrAvailability.defaultVadModelPath ? `（将下载到：${asrAvailability.defaultVadModelPath}）` : ''}
                 </p>
               )}
             </div>
           )}
 
-          {asrAvailability.missingModel && (
+          {(asrAvailability.missingModel || asrAvailability.missingVadModel) && (
             <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={handleDownloadAsrModel}
                 disabled={asrModelDownloadState.inProgress}
                 className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm transition-colors"
               >
-                {asrModelDownloadState.inProgress ? '下载模型中...' : '一键下载 base 模型'}
+                {asrModelDownloadState.inProgress ? '下载模型中...' : '一键下载 medium + VAD 模型'}
               </button>
               {asrModelDownloadState.message && (
                 <span className="text-xs text-amber-800">
@@ -399,20 +412,20 @@ export const HistoryPage: React.FC = () => {
                                 <button
                                   onClick={() => handleStartAsr(item.id, item.filePath)}
                                   disabled={isRunning || !asrAvailability.available}
-                                  className="p-2 rounded-lg bg-surface-tertiary hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed text-text-secondary transition-colors"
+                                  className="p-2 rounded-lg bg-blue-50 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed text-blue-600 transition-colors"
                                   title={asrAvailability.available ? '语音转文字（ASR）' : 'ASR 不可用'}
                                 >
                                   {isRunning ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                   ) : (
-                                    <FileText className="w-4 h-4" />
+                                    <Mic className="w-4 h-4" />
                                   )}
                                 </button>
 
                                 {outputPath && (
                                   <button
                                     onClick={() => window.electronAPI.showItemInFolder(outputPath)}
-                                    className="p-2 rounded-lg bg-surface-tertiary hover:bg-surface-hover text-text-secondary transition-colors"
+                                    className="p-2 rounded-lg bg-surface-tertiary hover:bg-surface-hover text-text-secondary hover:text-text-primary transition-colors"
                                     title="打开转写文件"
                                   >
                                     <FileText className="w-4 h-4" />
